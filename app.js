@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------
 // 保存データ（設定と食事の記録）
 // ---------------------------------------------------------------------
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.7.0';
 const APP_UPDATED = '2026-11-10';
 
 const STORE_KEY = 'menuPlanner.v2';
@@ -148,7 +148,7 @@ function baseWeight(r) {
     const rating = state.ratings[r.id];
     if (rating === 1) w *= 1.5;
     if (rating === -1) w *= 0.35;
-    return w;
+    return w / familySize(r.id); // なかま（具違い）全体で1品ぶんの出やすさに
 }
 
 const isFavorite = id => state.favorites.includes(id);
@@ -168,7 +168,9 @@ function lastEatenDays() {
     const map = new Map();
     state.history.forEach(h => {
         const n = daysSince(h.date);
-        if (!map.has(h.id) || map.get(h.id) > n) map.set(h.id, n);
+        familyIds(h.id).forEach(id => {
+            if (!map.has(id) || map.get(id) > n) map.set(id, n);
+        });
     });
     return map;
 }
@@ -430,6 +432,7 @@ function createRecipeCard(recipe, opts = {}) {
         </div>
         <p class="card-meta">${meta.join('<span class="sep">·</span>')}</p>
         ${opts.matchInfo ? `<p class="match-info ${opts.matchInfo.ok ? 'ok' : ''}">${opts.matchInfo.ok ? icon('check') : ''}${esc(opts.matchInfo.text)}${opts.matchInfo.urgent ? `<span class="urgent-note">${icon('alarm')}${esc(opts.matchInfo.urgent)}</span>` : ''}</p>` : ''}
+        ${opts.variants && opts.variants.length ? `<p class="variants">ほかの具・味: ${opts.variants.slice(0, 4).map(esc).join('、')}${opts.variants.length > 4 ? ` ほか${opts.variants.length - 4}品` : ''}</p>` : ''}
         ${myAllergenWarning(recipe)}
         ${opts.compact ? `<div class="nutri-row">${nutrientChips(recipe)}</div>` : `<details class="card-ings">
             <summary>材料・栄養（材料 ${recipe.ingredients.length + recipe.alternatives.length}）</summary>
@@ -496,6 +499,24 @@ document.addEventListener('click', e => {
     document.querySelectorAll('.card-menu[open]').forEach(m => { if (!m.contains(e.target)) m.open = false; });
 });
 
+/**
+ * 一覧で、なかま（具違い）の料理を1枚にまとめる。並び順で先に来たものを代表にする
+ * 戻り値: { list, others: Map(代表のid → ほかのなかまの名前) }
+ */
+function collapseFamilies(list) {
+    const shown = new Map();
+    const others = new Map();
+    const out = [];
+    list.forEach(r => {
+        if (!r.family) { out.push(r); return; }
+        if (shown.has(r.family)) { others.get(shown.get(r.family)).push(r.name); return; }
+        shown.set(r.family, r.id);
+        others.set(r.id, []);
+        out.push(r);
+    });
+    return { list: out, others };
+}
+
 // スマホでは一度に出す枚数を少なめに
 const PAGE_SIZE = window.matchMedia('(max-width: 600px)').matches ? 12 : 24;
 
@@ -540,7 +561,10 @@ function renderRecipes(recipesArray, container, opts = {}) {
     more.className = 'secondary-btn more-btn';
     const showMore = () => {
         recipesArray.slice(shown, shown + PAGE_SIZE).forEach(r => {
-            grid.appendChild(createRecipeCard(r, { matchInfo: opts.matchInfo ? opts.matchInfo(r) : null }));
+            grid.appendChild(createRecipeCard(r, {
+                matchInfo: opts.matchInfo ? opts.matchInfo(r) : null,
+                variants: opts.others ? opts.others.get(r.id) : null,
+            }));
         });
         shown += PAGE_SIZE;
         if (shown >= recipesArray.length) more.remove();
@@ -802,14 +826,15 @@ function runIngredientSearch(scroll) {
         || (info.get(b.id).urgentUsed.length - info.get(a.id).urgentUsed.length)
         || (info.get(b.id).used - info.get(a.id).used)
         || (baseWeight(b) - baseWeight(a)));
-    const ready = ok.filter(r => info.get(r.id).missing.length <= 1);
-    const list = picking && readyOnly ? ready : ok;
+    const collapsed = collapseFamilies(ok);
+    const ready = collapsed.list.filter(r => info.get(r.id).missing.length <= 1);
+    const list = picking && readyOnly ? ready : collapsed.list;
 
     let header = null;
     if (picking) {
         header = document.createElement('div');
         header.className = 'result-toolbar';
-        const zero = ok.filter(r => info.get(r.id).missing.length === 0).length;
+        const zero = collapsed.list.filter(r => info.get(r.id).missing.length === 0).length;
         header.innerHTML = `<span class="muted small">全部そろってる料理 <strong>${zero}</strong> 品・あと1つで作れる料理 <strong>${ready.length - zero}</strong> 品</span>`;
         const toggle = document.createElement('button');
         toggle.type = 'button';
@@ -820,7 +845,7 @@ function runIngredientSearch(scroll) {
         header.appendChild(toggle);
     }
     renderRecipes(list, 'ingredient-result', {
-        notice: exclusionNotice(counts), emptyHint: emptyHint(counts), header,
+        notice: exclusionNotice(counts), emptyHint: emptyHint(counts), header, others: collapsed.others,
         matchInfo: picking ? r => readinessText(info.get(r.id)) : null,
     });
     if (scroll === true) document.getElementById('ingredient-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -981,7 +1006,8 @@ function showQuestionResult() {
     // 定番・かんたんな料理を上に。ただし毎回同じ並びにならないよう少し揺らす
     const keyed = ok.map(r => ({ r, k: baseWeight(r) * (0.7 + Math.random() * 0.6) }));
     keyed.sort((a, b) => b.k - a.k);
-    renderRecipes(keyed.map(x => x.r), questionResult, { notice: exclusionNotice(counts), emptyHint: emptyHint(counts) });
+    const collapsed = collapseFamilies(keyed.map(x => x.r));
+    renderRecipes(collapsed.list, questionResult, { notice: exclusionNotice(counts), emptyHint: emptyHint(counts), others: collapsed.others });
 }
 
 resetQuestionBtn.addEventListener('click', () => {
@@ -1057,7 +1083,7 @@ function generateInspiration() {
 
     // 条件に合うものから、主材料・ジャンルがなるべくかぶらないように1品選ぶ
     function pick(cond, reasonFn) {
-        let pool = ok.filter(r => cond(r) && !picks.some(p => p.r.id === r.id));
+        let pool = ok.filter(r => cond(r) && !picks.some(p => sameFamily(p.r.id, r.id)));
         const fresh = pool.filter(r => !usedMain.has(r.main) && !usedGenre.has(r.genre));
         if (fresh.length) pool = fresh;
         const r = weightedPick(pool, generalWeight);
@@ -1127,7 +1153,8 @@ const GENRE_AFFINITY = {
 };
 
 function pickSide(main, role, already, avoid = new Set()) {
-    const { ok } = applyFilters(RECIPES.filter(r => r.role === role && !already.some(a => a.id === r.id) && !avoid.has(r.id)));
+    const { ok } = applyFilters(RECIPES.filter(r => r.role === role && !already.some(a => sameFamily(a.id, r.id))
+        && !familyIds(r.id).some(id => avoid.has(id))));
     if (ok.length === 0) return null;
     const have = { ...main.nutrients };
     already.forEach(a => NUTRIENTS.forEach(n => { have[n.key] += a.nutrients[n.key]; }));
@@ -1280,7 +1307,7 @@ function renderBalance() {
             const r = weightedPick(pool, baseWeight);
             if (!r) break;
             picks.push(r);
-            pool.splice(pool.indexOf(r), 1);
+            for (let i = pool.length - 1; i >= 0; i--) if (sameFamily(pool[i].id, r.id)) pool.splice(i, 1);
         }
         if (picks.length) {
             const h = document.createElement('h3');
@@ -1858,7 +1885,7 @@ function pickPlanDay(plan, index, date, pool) {
     ctx.weekday = weekdayOf(date);
     ctx.remaining = plan.length - index;
     const used = new Set(plan.filter((d, i) => d && i !== index).map(d => d.main));
-    let candidates = pool.filter(r => !used.has(r.id));
+    let candidates = pool.filter(r => !familyIds(r.id).some(id => used.has(id)));
     // 最初の3日は、まだ使っていない「早めに使う」材料があればそれを使う料理から選ぶ
     if (index < 3) {
         const urgentLeft = [...urgentIngredients()].filter(i => !ctx.urgentDone.has(i));
@@ -2069,6 +2096,7 @@ function setShareText(items, totalKcal, withRice) {
 // 更新のお知らせ・更新履歴
 // ---------------------------------------------------------------------
 const CHANGELOG = [
+    { version: '2.7.0', items: ['具違いの料理（〜おにぎり、〜うどん など）を1品として扱い、出すぎないように'] },
     { version: '2.6.0', items: ['文字とボタンを大きくして、料理カードをすっきり（材料・栄養はたたんで表示）'] },
     { version: '2.5.0', items: ['絵文字をやめて、どの端末・テーマでも同じに見えるアイコンに'] },
     { version: '2.4.0', items: ['冷蔵庫の材料を覚えるように（「早めに使う」印も付けられる）', '1週間の献立で食材を使い回せるように', '献立・1週間の献立を LINE などに共有', '新しいバージョンのお知らせ'] },

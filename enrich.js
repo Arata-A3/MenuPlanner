@@ -176,3 +176,19 @@ const INGREDIENT_SCORE = (() => {
     RECIPES.forEach(r => r.allIngs.forEach(i => { score[i] = (score[i] || 0) + w[r.pop]; }));
     return score;
 })();
+
+// 実質同じ料理のなかま（DISH_FAMILIES）。id → なかまの id 一覧
+const FAMILY_IDS = (() => {
+    const byName = new Map(RECIPES.map(r => [r.name, r]));
+    const map = new Map();
+    Object.entries(DISH_FAMILIES).forEach(([key, names]) => {
+        const members = names.map(n => byName.get(n)).filter(Boolean);
+        members.forEach(r => { r.family = key; map.set(r.id, members.map(m => m.id)); });
+    });
+    return map;
+})();
+
+/** なかまの id 一覧（なかまがいなければ自分だけ） */
+const familyIds = id => FAMILY_IDS.get(id) || [id];
+const familySize = id => familyIds(id).length;
+const sameFamily = (a, b) => a === b || familyIds(a).includes(b);

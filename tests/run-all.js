@@ -4,7 +4,7 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 
-const tests = ['data.test.js', 'e2e-basic.js', 'e2e-v21.js', 'e2e-v23.js', 'e2e-v24.js'];
+const tests = ['data.test.js', 'e2e-basic.js', 'e2e-v21.js', 'e2e-v23.js', 'e2e-v24.js', 'e2e-v27.js'];
 const only = process.argv.slice(2);
 const failed = [];
 

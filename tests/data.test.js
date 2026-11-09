@@ -10,8 +10,8 @@ const vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const files = ['data.js', 'data-extra.js', 'meta.js', 'enrich.js'];
 const code = files.map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n')
-    + '\n;({ RECIPES, ALLERGENS, ALT_GROUPS, MINCE_MAP, PFC_TEXT, recipes, DUPLICATE_IDS });';
-const { RECIPES, ALLERGENS, ALT_GROUPS, MINCE_MAP, PFC_TEXT, recipes, DUPLICATE_IDS } = vm.runInNewContext(code, {});
+    + '\n;({ RECIPES, ALLERGENS, ALT_GROUPS, MINCE_MAP, PFC_TEXT, recipes, DUPLICATE_IDS, DISH_FAMILIES, familyIds });';
+const { RECIPES, ALLERGENS, ALT_GROUPS, MINCE_MAP, PFC_TEXT, recipes, DUPLICATE_IDS, DISH_FAMILIES, familyIds } = vm.runInNewContext(code, {});
 
 let failed = 0;
 function check(label, cond, detail = '') {
@@ -96,6 +96,14 @@ check('冷奴はレンジ・火なし', byName('冷奴').flags.micro);
 check('とんかつはレンジ・火なしではない', !byName('とんかつ').flags.micro);
 check('ステーキは節約ではない', !byName('ステーキ').flags.cheap);
 check('もやしのナムルは節約', byName('もやしのナムル').flags.cheap);
+
+// --- 具違いのなかま -------------------------------------------------------
+const famNames = Object.values(DISH_FAMILIES).flat();
+const missingFam = famNames.filter(n => !byName(n));
+check('なかまの料理名がすべて存在する', missingFam.length === 0, missingFam.join(', '));
+check('1つの料理は1つのなかまだけに入る', new Set(famNames).size === famNames.length);
+check('鮭おにぎりと梅おにぎりはなかま', familyIds(byName('鮭おにぎり').id).includes(byName('梅おにぎり').id));
+check('焼きおにぎり・カレーうどんはなかまに入れない', !byName('焼きおにぎり').family && !byName('カレーうどん').family);
 
 console.log(failed ? `\n${failed} 件失敗` : '\nALL OK');
 process.exitCode = failed ? 1 : 0;

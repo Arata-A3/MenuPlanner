@@ -1987,3 +1987,9 @@ body { line-height: 1.65; }
 .chip-options button { font-size: 0.95rem; padding: 5px 13px; }
 .caution { font-size: 0.88rem; }
 .segmented button { font-size: 0.95rem; padding: 8px 14px; }
+
+/* なかま（具違い）の料理 */
+.variants {
+    font-size: 0.88rem;
+    color: var(--muted);
+}
