@@ -67,13 +67,13 @@ const server = http.createServer((req, res) => {
     // 牛肉アレルギーでもカレーは出る（豚・鶏で作れる）
     await page.click('#open-settings');
     await page.click('#allergen-options button:text-is("牛肉")');
-    await page.click('#settings-close');
+    await page.click('#settings-close'); await page.waitForTimeout(200); // close イベント後の再表示を待つ
     const namesBeef = await page.locator('#ingredient-result .recipe-card h3').allTextContents();
     check('牛肉アレルギーでもカレーライスは候補に残る', namesBeef.includes('カレーライス'));
     check('牛肉アレルギーで肉じゃが(豚でOK)も残る', namesBeef.includes('肉じゃが'));
     await page.click('#open-settings');
     await page.click('#allergen-options button:text-is("牛肉")');
-    await page.click('#settings-close');
+    await page.click('#settings-close'); await page.waitForTimeout(200); // close イベント後の再表示を待つ
 
     // お気に入り
     await curry.locator('.fav-btn').click();

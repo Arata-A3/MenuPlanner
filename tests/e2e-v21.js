@@ -59,13 +59,13 @@ const server = http.createServer((req, res) => {
     // 調味料の扱い：大豆アレルギーで「含めて」と「除く」の件数比較
     await page.click('#allergen-options button:text-is("大豆")');
     await page.click('[data-setting="allergenScope"] button[data-value="all"]');
-    await page.click('#settings-close');
+    await page.click('#settings-close'); await page.waitForTimeout(200); // close イベント後の再表示を待つ
     await page.click('#search-by-ingredient');
     const countAll = await page.evaluate(() => parseInt(document.querySelector('#ingredient-result .result-count').textContent));
     const badAll = await page.evaluate(() => [...document.querySelectorAll('#ingredient-result .recipe-card h3')].map(h => RECIPES.find(r => r.name === h.textContent)).filter(r => r.allergens.includes('soy') || r.seasoningAllergens.includes('soy')).length);
     await page.click('#open-settings'); await page.evaluate(() => document.querySelectorAll('#settings-dialog details').forEach(d => d.open = true));
     await page.click('[data-setting="allergenScope"] button[data-value="main"]');
-    await page.click('#settings-close');
+    await page.click('#settings-close'); await page.waitForTimeout(200); // close イベント後の再表示を待つ
     const countMain = await page.evaluate(() => parseInt(document.querySelector('#ingredient-result .result-count').textContent));
     const badMain = await page.evaluate(() => [...document.querySelectorAll('#ingredient-result .recipe-card h3')].map(h => RECIPES.find(r => r.name === h.textContent)).filter(r => r.allergens.includes('soy')).length);
     check(`大豆: 調味料含む ${countAll}品 / 調味料除く ${countMain}品（違反 ${badAll}/${badMain}）`, countMain > countAll && badAll === 0 && badMain === 0);
@@ -75,7 +75,7 @@ const server = http.createServer((req, res) => {
     await page.click('#open-settings'); await page.evaluate(() => document.querySelectorAll('#settings-dialog details').forEach(d => d.open = true));
     await page.click('[data-setting="servings"] button[data-value="4"]');
     await page.screenshot({ path: path.join(OUT, 'v21-2-settings.png'), fullPage: true });
-    await page.click('#settings-close');
+    await page.click('#settings-close'); await page.waitForTimeout(200); // close イベント後の再表示を待つ
     const href = await page.locator('#ingredient-result .search-recipe-btn').first().getAttribute('href');
     check('レシピ検索に人数が入る', decodeURIComponent(href).includes('4人分'));
 
@@ -120,7 +120,7 @@ const server = http.createServer((req, res) => {
     await page.click('[data-setting="theme"] button[data-value="dark"]');
     const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     check(`ダークモードで背景が暗い (${bg})`, bg === 'rgb(21, 17, 14)');
-    await page.click('#settings-close');
+    await page.click('#settings-close'); await page.waitForTimeout(200); // close イベント後の再表示を待つ
     await page.click('#search-by-ingredient');
     await page.screenshot({ path: path.join(OUT, 'v21-4-dark.png') });
     await page.locator('#ingredient-result .set-btn').first().click();
@@ -139,7 +139,7 @@ const server = http.createServer((req, res) => {
     await m.waitForSelector('.ingredient-tag');
     await m.click('#open-settings'); await m.evaluate(() => document.querySelectorAll('#settings-dialog details').forEach(d => d.open = true));
     await m.screenshot({ path: path.join(OUT, 'v21-6-mobile-settings.png') });
-    await m.click('#settings-close');
+    await m.click('#settings-close'); await m.waitForTimeout(200);
     const overflow = await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     check('スマホ幅で横スクロールが出ない', !overflow);
     await m.screenshot({ path: path.join(OUT, 'v21-7-mobile-top.png'), fullPage: false });

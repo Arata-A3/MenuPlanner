@@ -63,7 +63,7 @@ const server = http.createServer((req, res) => {
             await page.click('#dislike-add');
             await page.click('[data-setting="minor"] button[data-value="never"]');
             await page.screenshot({ path: path.join(OUT, `2-settings.png`) });
-            await page.click('#settings-close');
+            await page.click('#settings-close'); await page.waitForTimeout(200); // close イベント後の再表示を待つ
             const allergenOk = await page.evaluate(() => {
                 const s = JSON.parse(localStorage.getItem('menuPlanner.v2')).settings;
                 return s.allergens.join(',') + '|' + s.dislikes.join(',') + '|' + s.minor;
