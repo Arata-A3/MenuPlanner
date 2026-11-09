@@ -44,10 +44,12 @@
         <button class="tab-btn" data-target="random-tab"><span class="tab-icon">🎲</span><span class="tab-label">ランダム</span></button>
         <button class="tab-btn" data-target="question-tab"><span class="tab-icon">💬</span><span class="tab-label">質問</span></button>
         <button class="tab-btn" data-target="inspire-tab"><span class="tab-icon">💡</span><span class="tab-label">ひらめき</span></button>
+        <button class="tab-btn" data-target="week-tab"><span class="tab-icon">📆</span><span class="tab-label">1週間</span></button>
         <button class="tab-btn" data-target="history-tab"><span class="tab-icon">📅</span><span class="tab-label">記録</span></button>
     </nav>
 
     <main class="tab-content">
+        <div id="cond-bar" class="cond-bar" role="group" aria-label="条件フィルター"></div>
         <!-- 材料から絞り込む -->
         <section id="ingredient-tab" class="tab-pane active">
             <div class="pane-head">
@@ -103,6 +105,33 @@
             <div id="inspire-result" class="result-area"></div>
         </section>
 
+        <!-- 1週間の献立 -->
+        <section id="week-tab" class="tab-pane">
+            <div class="pane-head">
+                <h2>1週間の献立をまとめて作る</h2>
+                <p>ジャンル・主材料が続かないように、平日はかんたんな料理を多めに組みます</p>
+            </div>
+            <div class="week-options">
+                <div>
+                    <span class="opt-label">日数</span>
+                    <div class="segmented" data-week="days">
+                        <button data-value="3">3日</button>
+                        <button data-value="5">5日</button>
+                        <button data-value="7">7日</button>
+                    </div>
+                </div>
+                <div>
+                    <span class="opt-label">形</span>
+                    <div class="segmented" data-week="withSides">
+                        <button data-value="main">主菜だけ</button>
+                        <button data-value="set">副菜・汁物も</button>
+                    </div>
+                </div>
+            </div>
+            <button id="start-week" class="primary-btn wide">献立を作る 📆</button>
+            <div id="week-result" class="result-area"></div>
+        </section>
+
         <!-- 記録 -->
         <section id="history-tab" class="tab-pane">
             <div class="pane-head">
@@ -120,7 +149,13 @@
                 <div id="balance-area" class="balance-area"></div>
             </div>
             <div class="panel">
-                <h3 class="panel-title">📅 最近30日間</h3>
+                <h3 class="panel-title">⭐ お気に入り</h3>
+                <div id="fav-list" class="pref-list"></div>
+                <h3 class="panel-title sub">🚫 もう出さない料理</h3>
+                <div id="blocked-list" class="pref-list"></div>
+            </div>
+            <div class="panel">
+                <h3 class="panel-title">📅 最近30日間 <span class="muted small">👍👎 で評価すると提案に反映されます</span></h3>
                 <div id="history-list" class="history-list"></div>
                 <button id="history-clear" class="text-btn danger">記録をすべて消す</button>
             </div>

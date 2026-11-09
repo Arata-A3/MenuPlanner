@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------
 // 保存データ（設定と食事の記録）
 // ---------------------------------------------------------------------
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 const APP_UPDATED = '2026-11-10';
 
 const STORE_KEY = 'menuPlanner.v2';
@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS = {
     hard: 'rare',           // 手間のかかる料理: never / rare / normal
     servings: 2,            // 何人分作るか
     theme: 'auto',          // auto / light / dark
+    conditions: [],         // 条件フィルター: mild / micro / cheap / quick
 };
 
 /** 読み込んだデータを、壊れた値が混ざっていても使える形に整える */
@@ -36,7 +37,25 @@ function normalizeState(parsed) {
             name: s.name, from: Array.isArray(s.from) ? s.from.filter(f => typeof f === 'string') : [], checked: !!s.checked,
         }))
         : [];
-    return { settings, history, shopping };
+    if (!Array.isArray(settings.conditions)) settings.conditions = [];
+    settings.conditions = settings.conditions.filter(k => CONDITIONS.some(c => c.key === k));
+    const ids = list => (Array.isArray(list) ? [...new Set(list.filter(id => RECIPE_BY_ID.has(id)))] : []);
+    const favorites = ids(parsed && parsed.favorites);
+    const blocked = ids(parsed && parsed.blocked);
+    const ratings = {};
+    if (parsed && parsed.ratings && typeof parsed.ratings === 'object') {
+        Object.entries(parsed.ratings).forEach(([id, v]) => {
+            if (RECIPE_BY_ID.has(Number(id)) && (v === 1 || v === -1)) ratings[id] = v;
+        });
+    }
+    let weekPlan = null;
+    const wp = parsed && parsed.weekPlan;
+    if (wp && Array.isArray(wp.days)) {
+        const days = wp.days.filter(d => d && /^\d{4}-\d{2}-\d{2}$/.test(d.date) && RECIPE_BY_ID.has(d.main))
+            .map(d => ({ date: d.date, main: d.main, sides: ids(d.sides) }));
+        if (days.length) weekPlan = { withSides: !!wp.withSides, days };
+    }
+    return { settings, history, shopping, favorites, blocked, ratings, weekPlan };
 }
 
 function loadState() {
@@ -111,10 +130,33 @@ function shuffle(arr) {
 const POP_WEIGHT = { never: [1, 0.7, 0], rare: [1, 0.55, 0.12], normal: [1, 0.9, 0.6] };
 const DIFF_WEIGHT = { never: [1, 1, 0], rare: [1, 0.85, 0.25], normal: [1, 1, 0.8] };
 
+/** 設定（マイナー・手間）だけで決まる重み。0 なら「出さない」 */
+function settingWeight(r) {
+    return POP_WEIGHT[state.settings.minor][r.pop - 1] * DIFF_WEIGHT[state.settings.hard][r.diff - 1];
+}
+
+/** 提案のしやすさ（お気に入り・評価も反映） */
 function baseWeight(r) {
-    let w = POP_WEIGHT[state.settings.minor][r.pop - 1] * DIFF_WEIGHT[state.settings.hard][r.diff - 1];
+    let w = settingWeight(r);
     if (r.role === 'T') w *= 0.3; // おつまみ・軽食は控えめに
+    if (isFavorite(r.id)) w *= 1.8;
+    const rating = state.ratings[r.id];
+    if (rating === 1) w *= 1.5;
+    if (rating === -1) w *= 0.35;
     return w;
+}
+
+const isFavorite = id => state.favorites.includes(id);
+const isBlocked = id => state.blocked.includes(id);
+
+function meetsConditions(r) {
+    return state.settings.conditions.every(c => {
+        if (c === 'mild') return !r.flags.spicy;
+        if (c === 'micro') return r.flags.micro;
+        if (c === 'cheap') return r.flags.cheap;
+        if (c === 'quick') return r.time === '短め';
+        return true;
+    });
 }
 
 function lastEatenDays() {
@@ -126,8 +168,11 @@ function lastEatenDays() {
     return map;
 }
 
+/** 苦手な食材を使う料理か（「どれか1つ」の材料は、全部が苦手なときだけ） */
 function matchesDislike(r) {
-    return state.settings.dislikes.some(w => r.name.includes(w) || r.ingredients.some(i => i.includes(w)));
+    return state.settings.dislikes.some(w => r.name.includes(w)
+        || r.ingredients.some(i => i.includes(w))
+        || r.alternatives.some(g => g.every(i => i.includes(w))));
 }
 
 /** 設定に引っかかる理由を返す（問題なければ null） */
@@ -140,17 +185,19 @@ function hitsAllergy(r) {
 
 function exclusionReason(r, eaten) {
     if (hitsAllergy(r)) return 'allergy';
+    if (isBlocked(r.id)) return 'blocked';
     if (matchesDislike(r)) return 'dislike';
+    if (!meetsConditions(r)) return 'condition';
     const days = state.settings.recentDays;
     if (days > 0 && eaten.has(r.id) && eaten.get(r.id) < days) return 'recent';
-    if (baseWeight(r) === 0) return 'setting';
+    if (settingWeight(r) === 0) return 'setting';
     return null;
 }
 
 /** 設定で除外される料理を取り除き、除外件数も返す */
 function applyFilters(list) {
     const eaten = lastEatenDays();
-    const counts = { allergy: 0, dislike: 0, recent: 0, setting: 0 };
+    const counts = { allergy: 0, blocked: 0, dislike: 0, condition: 0, recent: 0, setting: 0 };
     const ok = [];
     list.forEach(r => {
         const reason = exclusionReason(r, eaten);
@@ -163,7 +210,9 @@ function applyFilters(list) {
 function exclusionNotice(counts) {
     const parts = [];
     if (counts.allergy) parts.push(`アレルギー${state.settings.allergenScope === 'all' ? '（調味料含む）' : ''} ${counts.allergy}品`);
+    if (counts.blocked) parts.push(`非表示にした料理 ${counts.blocked}品`);
     if (counts.dislike) parts.push(`苦手な食材 ${counts.dislike}品`);
+    if (counts.condition) parts.push(`条件に合わない料理 ${counts.condition}品`);
     if (counts.recent) parts.push(`最近食べた料理 ${counts.recent}品`);
     if (counts.setting) parts.push(`マイナー・手間のかかる料理 ${counts.setting}品`);
     return parts.length ? `設定により ${parts.join('、')} を除外しています` : '';
@@ -174,6 +223,7 @@ function emptyHint(counts) {
     if (counts.allergy && state.settings.allergenScope === 'all') {
         return '💡 醤油・だしなど調味料に含まれやすいものまで除外しています。設定の「調味料の扱い」を「調味料は除く」にすると候補が増えます（アレルギー対応の調味料を使う場合など）。';
     }
+    if (counts.condition) return '💡 上の条件（辛くない・レンジ・節約・時短）を外すと候補が増えます。';
     if (counts.setting) return '💡 設定の「マイナーな料理」「手間のかかる料理」を「たまに」以上にすると候補が増えます。';
     if (counts.recent) return '💡 設定の「最近食べた料理を除外」の日数を短くすると候補が増えます。';
     return '';
@@ -196,10 +246,10 @@ const COOL_DISH = /冷やし|冷奴|ざる|冷しゃぶ|冷製|カルパッチ�
 function seasonInfo(r) {
     const month = new Date().getMonth() + 1;
     const season = SEASONS.find(s => s.months.includes(month));
-    const seasonal = r.ingredients.find(i => season.ings.includes(i) && i !== 'ねぎ' && i !== 'キャベツ');
+    const seasonal = r.allIngs.find(i => season.ings.includes(i) && i !== 'ねぎ' && i !== 'キャベツ');
     if (COLD_MONTHS.includes(month)) {
         if (WARM_DISH.test(r.name) || r.role === 'N') return { factor: 1.5, reason: '寒い日にあったまる' };
-        if (/冷やし|冷奴|ざる|冷しゃぶ|冷製/.test(r.name)) return { factor: 0.4, reason: null };
+        if (/冷やし|冷奴|ざる|冷しゃぶ|冷製|冷麺|ビビン麺|そうめん|冷や汁|ガスパチョ|ビシソワーズ|ポキ/.test(r.name)) return { factor: 0.3, reason: null };
     }
     if (HOT_MONTHS.includes(month)) {
         if (COOL_DISH.test(r.name)) return { factor: 1.5, reason: '暑い日にさっぱり' };
@@ -267,17 +317,20 @@ function nutrientChips(r) {
 }
 
 function allergenLine(r) {
-    if (r.allergens.length === 0 && r.seasoningAllergens.length === 0) return '';
+    if (r.allergens.length === 0 && r.optionalAllergens.length === 0 && r.seasoningAllergens.length === 0) return '';
     const mine = state.settings.allergens;
     const fmt = keys => keys.map(k => {
         const label = ALLERGEN_BY_KEY.get(k).label;
         return mine.includes(k) ? `<strong>${label}</strong>` : label;
     }).join('・');
     const main = r.allergens.length ? `<span class="allergen-main">⚠️ ${fmt(r.allergens)}</span>` : '';
+    const optional = r.optionalAllergens.length
+        ? `<span class="optional-allergens" title="「どれか1つ」の材料の選び方で変わります">選ぶ材料による: ${fmt(r.optionalAllergens)}</span>`
+        : '';
     const seasoning = r.seasoningAllergens.length
         ? `<span class="seasoning-allergens">調味料: ${fmt(r.seasoningAllergens)}</span>`
         : '';
-    return `<p class="recipe-allergens">${main}${seasoning}</p>`;
+    return `<p class="recipe-allergens">${main}${optional}${seasoning}</p>`;
 }
 
 function difficultyStars(diff) {
@@ -289,31 +342,82 @@ function isEatenToday(id) {
     return state.history.some(h => h.id === id && h.date === today);
 }
 
+/** 材料の表示（「どれか1つ」は「豚肉 / 牛肉 / 鶏肉 のどれか」） */
+function ingredientText(r) {
+    const parts = r.ingredients.map(esc);
+    r.alternatives.forEach(g => parts.push(`<span class="alt-ing">${g.map(esc).join(' / ')} のどれか</span>`));
+    return parts.join('、');
+}
+
+function pfcText(pfc) {
+    return `P ${pfc.p}g・F ${pfc.f}g・C ${pfc.c}g`;
+}
+
+function toggleFavorite(id) {
+    if (isFavorite(id)) state.favorites = state.favorites.filter(x => x !== id);
+    else state.favorites.push(id);
+    saveState();
+}
+
+function setRating(id, value) {
+    if (state.ratings[id] === value) delete state.ratings[id];
+    else state.ratings[id] = value;
+    saveState();
+}
+
+function blockRecipe(id) {
+    if (!isBlocked(id)) state.blocked.push(id);
+    state.favorites = state.favorites.filter(x => x !== id);
+    saveState();
+}
+
+function unblockRecipe(id) {
+    state.blocked = state.blocked.filter(x => x !== id);
+    saveState();
+}
+
 function createRecipeCard(recipe, opts = {}) {
     const card = document.createElement('article');
     card.className = 'recipe-card' + (opts.compact ? ' compact' : '');
+    card.dataset.id = recipe.id;
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${recipe.name} レシピ ${state.settings.servings}人分`)}`;
     const eaten = isEatenToday(recipe.id);
     const canMakeSet = ['K', 'M', 'N'].includes(recipe.role) && !opts.noSet;
+    const fav = isFavorite(recipe.id);
+    const rating = state.ratings[recipe.id];
     const meta = [
         `<span class="role-dot role-${recipe.role}"></span>${ROLE_LABELS[recipe.role]}`,
         recipe.genre,
         `⏱${recipe.time}`,
         `<span title="手間">手間${difficultyStars(recipe.diff)}</span>`,
     ];
+    if (recipe.flags.spicy) meta.push('<span title="辛い料理">🌶️</span>');
+    if (recipe.flags.micro) meta.push('<span title="レンジ・火なしで作れる目安">🔌</span>');
     if (recipe.pop === 3) meta.push('<span class="rare">レア</span>');
+    if (rating === 1) meta.push('<span title="おいしかった">👍</span>');
+    if (rating === -1) meta.push('<span title="いまいち">👎</span>');
 
     card.innerHTML = `
         ${opts.reason ? `<div class="reason-chip">${esc(opts.reason)}</div>` : ''}
         <div class="card-head">
             <h3>${esc(recipe.name)}</h3>
             <span class="kcal" title="1人前の目安${recipe.role === 'K' ? '（ご飯別）' : ''}">${recipe.kcal}<small>kcal</small></span>
+            <button class="fav-btn${fav ? ' on' : ''}" aria-pressed="${fav}" title="お気に入り">${fav ? '★' : '☆'}</button>
+            <details class="card-menu">
+                <summary title="その他の操作" aria-label="その他の操作">⋯</summary>
+                <div class="card-menu-list">
+                    <button data-act="good">${rating === 1 ? '✓ ' : ''}👍 おいしかった</button>
+                    <button data-act="bad">${rating === -1 ? '✓ ' : ''}👎 いまいち</button>
+                    <button data-act="block">🚫 もう出さない</button>
+                </div>
+            </details>
         </div>
         <p class="card-meta">${meta.join('<span class="sep">·</span>')}</p>
-        ${opts.matchInfo ? `<p class="match-info">${esc(opts.matchInfo)}</p>` : ''}
+        ${recipe.pfc ? `<p class="pfc" title="たんぱく質・脂質・炭水化物（1人前の目安）">${pfcText(recipe.pfc)}</p>` : ''}
+        ${opts.matchInfo ? `<p class="match-info ${opts.matchInfo.ok ? 'ok' : ''}">${esc(opts.matchInfo.text)}</p>` : ''}
         <div class="nutri-row">${nutrientChips(recipe)}</div>
         ${allergenLine(recipe)}
-        ${opts.compact ? '' : `<details class="card-ings"><summary>材料（${recipe.ingredients.length}）</summary><p>${recipe.ingredients.map(esc).join('、')}</p></details>`}
+        ${opts.compact ? '' : `<details class="card-ings"><summary>材料（${recipe.ingredients.length + recipe.alternatives.length}）</summary><p>${ingredientText(recipe)}</p></details>`}
         <div class="card-actions">
             <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" class="act search-recipe-btn" title="レシピを検索"><span class="act-icon">🔍</span><span>レシピ</span></a>
             <button class="act eat-btn" ${eaten ? 'disabled' : ''} title="今日食べた料理として記録"><span class="act-icon">${eaten ? '✓' : '🍽️'}</span><span class="eat-label">${eaten ? '記録済み' : '食べた'}</span></button>
@@ -323,19 +427,52 @@ function createRecipeCard(recipe, opts = {}) {
     `;
     card.querySelector('.shop-btn').addEventListener('click', () => addToShopping([recipe]));
 
+    const favBtn = card.querySelector('.fav-btn');
+    favBtn.addEventListener('click', () => {
+        toggleFavorite(recipe.id);
+        const on = isFavorite(recipe.id);
+        favBtn.classList.toggle('on', on);
+        favBtn.textContent = on ? '★' : '☆';
+        favBtn.setAttribute('aria-pressed', String(on));
+        showToast(on ? `「${recipe.name}」をお気に入りにしました` : 'お気に入りから外しました');
+    });
+
+    const menu = card.querySelector('.card-menu');
+    menu.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => {
+        menu.open = false;
+        const act = b.dataset.act;
+        if (act === 'block') {
+            blockRecipe(recipe.id);
+            card.classList.add('removed');
+            setTimeout(() => card.remove(), 250);
+            showToast(`「${recipe.name}」はもう出しません（記録タブで戻せます）`);
+            return;
+        }
+        setRating(recipe.id, act === 'good' ? 1 : -1);
+        const replaced = createRecipeCard(recipe, opts);
+        card.replaceWith(replaced);
+        const v = state.ratings[recipe.id];
+        showToast(v === 1 ? 'おいしかった料理は出やすくなります' : v === -1 ? 'いまいちだった料理は出にくくなります' : '評価を取り消しました');
+    }));
+
     const eatBtn = card.querySelector('.eat-btn');
     eatBtn.addEventListener('click', () => {
         addHistory(recipe.id, dateStr());
         eatBtn.disabled = true;
         eatBtn.querySelector('.act-icon').textContent = '✓';
         eatBtn.querySelector('.eat-label').textContent = '記録済み';
-        showToast(`「${recipe.name}」を今日の記録に追加しました`);
+        showToast(`「${recipe.name}」を記録しました。⋯ から評価もできます`);
     });
     if (canMakeSet) {
         card.querySelector('.set-btn').addEventListener('click', () => openSetDialog(recipe));
     }
     return card;
 }
+
+// 開いている ⋯ メニューは、外側をタップしたら閉じる
+document.addEventListener('click', e => {
+    document.querySelectorAll('.card-menu[open]').forEach(m => { if (!m.contains(e.target)) m.open = false; });
+});
 
 // スマホでは一度に出す枚数を少なめに
 const PAGE_SIZE = window.matchMedia('(max-width: 600px)').matches ? 12 : 24;
@@ -351,6 +488,7 @@ function renderRecipes(recipesArray, container, opts = {}) {
         p.textContent = opts.notice;
         container.appendChild(p);
     }
+    if (opts.header) container.appendChild(opts.header);
 
     if (recipesArray.length === 0) {
         const p = document.createElement('p');
@@ -416,7 +554,9 @@ tabBtns.forEach(btn => {
         tabPanes.forEach(pane => pane.classList.remove('active'));
         document.getElementById(btn.dataset.target).classList.add('active');
         window.scrollTo({ top: 0 });
+        document.body.dataset.tab = btn.dataset.target;
         if (btn.dataset.target === 'history-tab') renderHistory();
+        if (btn.dataset.target === 'week-tab') renderWeek();
         if (btn.dataset.target === 'inspire-tab') renderInspireSummary();
     });
 });
@@ -462,8 +602,16 @@ const ingredientGroups = (() => {
             ? allIngredients.filter(i => !shown.has(i))
             : [...new Set(list)].filter(i => allIngredients.includes(i) && !shown.has(i));
         items.forEach(i => shown.add(i));
+        // よく使われる材料ほど上に
+        items.sort((a, b) => (INGREDIENT_SCORE[b] || 0) - (INGREDIENT_SCORE[a] || 0));
         if (items.length) groups.push({ name: catName, items });
     });
+    // 先頭に「よく使う」材料（調味料・薬味を除く）
+    const popular = [...allIngredients]
+        .filter(i => !PANTRY_SET.has(i) && !OPTIONAL_INGS.has(i))
+        .sort((a, b) => (INGREDIENT_SCORE[b] || 0) - (INGREDIENT_SCORE[a] || 0))
+        .slice(0, 36);
+    groups.unshift({ name: '⭐ よく使う', items: popular });
     return groups;
 })();
 let activeCategory = ingredientGroups[0].name;
@@ -507,7 +655,7 @@ function renderIngredientCats() {
 function renderIngredientTags() {
     const q = ingredientFilter.value.trim();
     const items = q
-        ? allIngredients.filter(i => i.includes(q))
+        ? allIngredients.filter(i => i.includes(q)).sort((a, b) => (INGREDIENT_SCORE[b] || 0) - (INGREDIENT_SCORE[a] || 0))
         : ingredientGroups.find(g => g.name === activeCategory).items;
     ingredientContainer.innerHTML = '';
     if (items.length === 0) {
@@ -537,17 +685,70 @@ function renderSelectedChips() {
 ingredientFilter.addEventListener('input', renderIngredientTags);
 
 let ingredientSearched = false;
+let readyOnly = false; // 「すぐ作れる（足りない材料1つまで）」だけ表示
+
+/**
+ * 選んだ材料でどれだけ作れるか
+ *   used    : 選んだ材料のうち使うもの（「どれか1つ」は1つと数える）
+ *   missing : 足りない材料（調味料・薬味は家にある前提で数えない）
+ *   extra   : 足りないが、なくても作れる薬味など
+ */
+function readiness(r) {
+    const has = i => selectedIngredients.has(i);
+    let used = 0;
+    const missing = [];
+    const extra = [];
+    r.ingredients.forEach(i => {
+        if (has(i)) used++;
+        else if (PANTRY_SET.has(i)) { /* 調味料は家にある前提 */ }
+        else if (OPTIONAL_INGS.has(i)) extra.push(i);
+        else missing.push(i);
+    });
+    r.alternatives.forEach(g => {
+        if (g.some(has)) used++;
+        else if (!g.every(i => PANTRY_SET.has(i))) missing.push(`${g.join('・')}のどれか`);
+    });
+    return { used, missing, extra };
+}
+
+function readinessText(info) {
+    if (info.missing.length === 0) {
+        return { ok: true, text: `✔ 全部そろってる！${info.extra.length ? `（あれば: ${info.extra.slice(0, 3).join('、')}）` : ''}` };
+    }
+    const list = info.missing.slice(0, 3).join('、') + (info.missing.length > 3 ? ` ほか${info.missing.length - 3}つ` : '');
+    return { ok: false, text: `あと ${list}` };
+}
+
 function runIngredientSearch(scroll) {
     ingredientSearched = true;
-    const base = selectedIngredients.size === 0
-        ? RECIPES
-        : RECIPES.filter(r => r.ingredients.some(i => selectedIngredients.has(i)));
+    const picking = selectedIngredients.size > 0;
+    const info = new Map(RECIPES.map(r => [r.id, readiness(r)]));
+    const base = picking ? RECIPES.filter(r => info.get(r.id).used > 0) : RECIPES;
     const { ok, counts } = applyFilters(base);
-    const matchCount = r => r.ingredients.filter(i => selectedIngredients.has(i)).length;
-    ok.sort((a, b) => (matchCount(b) - matchCount(a)) || (baseWeight(b) - baseWeight(a)));
-    renderRecipes(ok, 'ingredient-result', {
-        notice: exclusionNotice(counts), emptyHint: emptyHint(counts),
-        matchInfo: selectedIngredients.size ? r => `✔ 選んだ材料を ${matchCount(r)} つ使用` : null,
+    // 足りない材料が少ない順 → 選んだ材料をたくさん使う順 → 定番順
+    ok.sort((a, b) => (info.get(a.id).missing.length - info.get(b.id).missing.length)
+        || (info.get(b.id).used - info.get(a.id).used)
+        || (baseWeight(b) - baseWeight(a)));
+    const ready = ok.filter(r => info.get(r.id).missing.length <= 1);
+    const list = picking && readyOnly ? ready : ok;
+
+    let header = null;
+    if (picking) {
+        header = document.createElement('div');
+        header.className = 'result-toolbar';
+        const zero = ok.filter(r => info.get(r.id).missing.length === 0).length;
+        header.innerHTML = `<span class="muted small">全部そろってる料理 <strong>${zero}</strong> 品・あと1つで作れる料理 <strong>${ready.length - zero}</strong> 品</span>`;
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'toggle-chip' + (readyOnly ? ' on' : '');
+        toggle.setAttribute('aria-pressed', String(readyOnly));
+        toggle.textContent = '🍳 すぐ作れるものだけ';
+        toggle.addEventListener('click', () => { readyOnly = !readyOnly; runIngredientSearch(false); });
+        header.appendChild(toggle);
+    }
+    renderRecipes(list, 'ingredient-result', {
+        notice: exclusionNotice(counts), emptyHint: emptyHint(counts), header,
+        matchInfo: picking ? r => readinessText(info.get(r.id)) : null,
     });
     if (scroll === true) document.getElementById('ingredient-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -804,6 +1005,7 @@ function generateInspiration() {
             r => `🔄 最近${avoidLabel}が多いので${trend.topMain ? MAIN_CATEGORIES[r.main].label : r.genre}で気分転換`,
         ]);
     }
+    slots.push([r => isFavorite(r.id) && (!eaten.has(r.id) || eaten.get(r.id) > 14), () => '⭐ お気に入りを久しぶりに']);
     slots.push([r => seasonInfo(r).reason !== null && seasonInfo(r).factor > 1, r => `🍂 ${seasonInfo(r).reason}`]);
     slots.push([r => r.pop >= 2 && !eaten.has(r.id), () => '✨ まだ記録にない料理に挑戦']);
     slots.push([r => r.pop === 1 && (!eaten.has(r.id) || eaten.get(r.id) > 14), () => '🏠 定番だけど最近食べていない']);
@@ -844,8 +1046,8 @@ const GENRE_AFFINITY = {
     '和食': ['和食'], '洋食': ['洋食'], '中華': ['中華', '和食'], '韓国': ['韓国', '和食', '中華'], 'エスニック': ['エスニック', '洋食', '中華'],
 };
 
-function pickSide(main, role, already) {
-    const { ok } = applyFilters(RECIPES.filter(r => r.role === role && !already.some(a => a.id === r.id)));
+function pickSide(main, role, already, avoid = new Set()) {
+    const { ok } = applyFilters(RECIPES.filter(r => r.role === role && !already.some(a => a.id === r.id) && !avoid.has(r.id)));
     if (ok.length === 0) return null;
     const have = { ...main.nutrients };
     already.forEach(a => NUTRIENTS.forEach(n => { have[n.key] += a.nutrients[n.key]; }));
@@ -861,11 +1063,11 @@ function pickSide(main, role, already) {
     });
 }
 
-function buildSet(main) {
+function buildSet(main, avoid = new Set()) {
     const items = [main];
     const sideRoles = main.role === 'K' ? ['F', 'S'] : main.role === 'N' ? ['F'] : ['F', 'S'];
     sideRoles.forEach(role => {
-        const side = pickSide(main, role, items);
+        const side = pickSide(main, role, items, avoid);
         if (side) items.push(side);
     });
     return items;
@@ -893,8 +1095,15 @@ function renderSet() {
     const summary = document.createElement('div');
     summary.className = 'set-summary';
     const servings = state.settings.servings;
+    // PFC はセットの全部の料理に目安があるときだけ合計を出す（ご飯茶碗1杯 = P4・F1・C55 として足す）
+    let pfcLine = '';
+    if (items.every(r => r.pfc)) {
+        const t = items.reduce((a, r) => ({ p: a.p + r.pfc.p, f: a.f + r.pfc.f, c: a.c + r.pfc.c }), withRice ? { p: 4, f: 1, c: 55 } : { p: 0, f: 0, c: 0 });
+        pfcLine = `<p class="pfc">${pfcText(t)}</p>`;
+    }
     summary.innerHTML = `
         <p>1人あたり 約 <strong>${totalKcal}</strong> kcal${servings > 1 ? `<span class="muted small">（${servings}人分で 約${totalKcal * servings}kcal）</span>` : ''}</p>
+        ${pfcLine}
         <div class="nutri-row">${NUTRIENTS.map(n => `<span class="nutri-chip lv${Math.min(2, sum[n.key])}">${n.icon}${n.short}${sum[n.key] >= 2 ? '◎' : sum[n.key] === 0 ? '✕' : ''}</span>`).join('')}</div>
     `;
     const eatAll = document.createElement('button');
@@ -1004,6 +1213,7 @@ function renderBalance() {
 
 function renderHistory() {
     renderBalance();
+    renderPreferences();
     historyList.innerHTML = '';
     if (state.history.length === 0) {
         historyList.innerHTML = '<p class="muted">まだ記録がありません。料理カードの「食べた！」ボタンか、上のフォームから記録できます。</p>';
@@ -1026,7 +1236,20 @@ function renderHistory() {
         entries.forEach(h => {
             const r = RECIPE_BY_ID.get(h.id);
             const li = document.createElement('li');
-            li.innerHTML = `<span>${esc(r.name)} <span class="muted small">${ROLE_LABELS[r.role]}</span></span>`;
+            li.innerHTML = `<span class="history-name">${esc(r.name)} <span class="muted small">${ROLE_LABELS[r.role]}</span></span>`;
+            // 食べたあとの評価（もう一度押すと取り消し）
+            const rate = document.createElement('span');
+            rate.className = 'rate-btns';
+            [[1, '👍', 'おいしかった'], [-1, '👎', 'いまいち']].forEach(([v, icon, label]) => {
+                const b = document.createElement('button');
+                b.className = 'rate-btn' + (state.ratings[r.id] === v ? ' on' : '');
+                b.title = label;
+                b.setAttribute('aria-pressed', String(state.ratings[r.id] === v));
+                b.textContent = icon;
+                b.addEventListener('click', () => { setRating(r.id, v); renderHistory(); });
+                rate.appendChild(b);
+            });
+            li.appendChild(rate);
             const del = document.createElement('button');
             del.className = 'icon-btn';
             del.title = '記録を消す';
@@ -1182,11 +1405,14 @@ document.getElementById('open-settings').addEventListener('click', () => {
 document.getElementById('settings-close').addEventListener('click', () => settingsDialog.close());
 
 // 設定を閉じたら、表示中の結果を新しい設定で作り直す
-settingsDialog.addEventListener('close', () => {
+/** 設定や条件が変わったとき、表示中の結果を作り直す */
+function refreshResults() {
     if (ingredientSearched) runIngredientSearch();
     if (!questionResult.classList.contains('hidden')) showQuestionResult();
     if (document.getElementById('history-tab').classList.contains('active')) renderHistory();
-});
+    renderConditionBar();
+}
+settingsDialog.addEventListener('close', refreshResults);
 
 // ダイアログの外側をタップしたら閉じる
 [settingsDialog, setDialog].forEach(d => {
@@ -1216,7 +1442,9 @@ function updateShoppingBadge() {
 function addToShopping(recipeList) {
     let added = 0;
     recipeList.forEach(r => {
-        r.ingredients.forEach(name => {
+        // 「どれか1つ」の材料は「豚肉 / 牛肉 / 鶏肉（どれか）」の1行にする
+        const names = [...r.ingredients, ...r.alternatives.map(g => `${g.join(' / ')}（どれか）`)];
+        names.forEach(name => {
             const item = state.shopping.find(s => s.name === name);
             if (item) {
                 if (!item.from.includes(r.name)) item.from.push(r.name);
@@ -1251,7 +1479,8 @@ function renderShopping() {
     state.shopping.forEach((item, index) => {
         const entry = { item, index };
         if (PANTRY_SET.has(item.name)) { pantry.list.push(entry); return; }
-        const sec = sections.find(s => s.items.has(item.name));
+        const key = item.name.split(' / ')[0].replace('（どれか）', '');
+        const sec = sections.find(s => s.items.has(key));
         (sec || other).list.push(entry);
     });
 
@@ -1390,11 +1619,280 @@ backupFile.addEventListener('change', async () => {
 });
 
 // ---------------------------------------------------------------------
+// 条件フィルター（辛くない・レンジ・節約・時短）
+// ---------------------------------------------------------------------
+const condBar = document.getElementById('cond-bar');
+
+function renderConditionBar() {
+    condBar.innerHTML = '<span class="cond-label">条件</span>';
+    CONDITIONS.forEach(c => {
+        const on = state.settings.conditions.includes(c.key);
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'toggle-chip' + (on ? ' on' : '');
+        b.setAttribute('aria-pressed', String(on));
+        b.title = c.desc;
+        b.textContent = c.label;
+        b.addEventListener('click', () => {
+            const list = state.settings.conditions;
+            state.settings.conditions = on ? list.filter(k => k !== c.key) : [...list, c.key];
+            saveState();
+            refreshResults();
+        });
+        condBar.appendChild(b);
+    });
+}
+
+// ---------------------------------------------------------------------
+// お気に入り・非表示の一覧（記録タブ）
+// ---------------------------------------------------------------------
+function renderPreferences() {
+    const favBox = document.getElementById('fav-list');
+    const blockBox = document.getElementById('blocked-list');
+    favBox.innerHTML = '';
+    blockBox.innerHTML = '';
+
+    if (state.favorites.length === 0) {
+        favBox.innerHTML = '<p class="muted small">料理カードの ☆ を押すとここに入ります。お気に入りは提案に出やすくなります。</p>';
+    }
+    state.favorites.forEach(id => {
+        const r = RECIPE_BY_ID.get(id);
+        const chip = document.createElement('span');
+        chip.className = 'pref-chip';
+        chip.innerHTML = `★ ${esc(r.name)}`;
+        const x = document.createElement('button');
+        x.className = 'icon-btn';
+        x.title = 'お気に入りから外す';
+        x.textContent = '✕';
+        x.addEventListener('click', () => { toggleFavorite(id); renderPreferences(); });
+        chip.appendChild(x);
+        favBox.appendChild(chip);
+    });
+
+    if (state.blocked.length === 0) {
+        blockBox.innerHTML = '<p class="muted small">カードの ⋯ →「もう出さない」を選んだ料理がここに入ります。</p>';
+    }
+    state.blocked.forEach(id => {
+        const r = RECIPE_BY_ID.get(id);
+        const chip = document.createElement('span');
+        chip.className = 'pref-chip blocked';
+        chip.textContent = r.name;
+        const back = document.createElement('button');
+        back.className = 'text-btn';
+        back.textContent = '戻す';
+        back.addEventListener('click', () => { unblockRecipe(id); renderPreferences(); showToast(`「${r.name}」をまた出すようにしました`); });
+        chip.appendChild(back);
+        blockBox.appendChild(chip);
+    });
+}
+
+// ---------------------------------------------------------------------
+// 1週間の献立
+// ---------------------------------------------------------------------
+const weekResult = document.getElementById('week-result');
+const weekOptions = {
+    days: state.weekPlan ? state.weekPlan.days.length : 7,
+    withSides: state.weekPlan ? state.weekPlan.withSides : false,
+};
+
+function addDays(str, n) {
+    const [y, m, d] = str.split('-').map(Number);
+    return dateStr(new Date(y, m - 1, d + n));
+}
+
+function weekdayOf(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d).getDay();
+}
+
+function weekLabel(str) {
+    const n = daysSince(str);
+    const [, m, d] = str.split('-').map(Number);
+    const wd = '日月火水木金土'[weekdayOf(str)];
+    const rel = n === 0 ? '今日' : n === -1 ? '明日' : n === 1 ? '昨日' : '';
+    return `${m}/${d}(${wd})${rel ? ` <span class="muted small">${rel}</span>` : ''}`;
+}
+
+/** その日の主菜の選びやすさ（前後の日とかぶらないように） */
+function planWeight(r, ctx) {
+    let w = baseWeight(r) * seasonInfo(r).factor;
+    if (ctx.eaten.has(r.id) && ctx.eaten.get(r.id) < 14) w *= 0.5;
+    const weekend = ctx.weekday === 0 || ctx.weekday === 6;
+    if (!weekend) {
+        if (r.diff === 3) w *= 0.25;
+        if (r.time === '長め') w *= 0.5;
+    } else if (r.diff >= 2) {
+        w *= 1.2;
+    }
+    ctx.neighbors.forEach(n => {
+        if (n.genre === r.genre) w *= 0.4;
+        if (n.main === r.main) w *= 0.3;
+    });
+    w *= Math.pow(0.55, ctx.mainCount[r.main] || 0);
+    w *= Math.pow(0.7, ctx.genreCount[r.genre] || 0);
+    if (r.role !== 'K') w *= Math.pow(0.5, ctx.roleCount[r.role] || 0);
+    if (r.role === 'K') w *= 1.3; // 主菜を中心に
+    if (!ctx.hasFish && r.main === 'fish' && ctx.remaining <= 3) w *= 2.5; // 1回は魚を
+    return w;
+}
+
+function planContext(plan, index) {
+    const ctx = { eaten: lastEatenDays(), mainCount: {}, genreCount: {}, roleCount: {}, hasFish: false, neighbors: [] };
+    plan.forEach((d, i) => {
+        if (i === index || !d) return;
+        const r = RECIPE_BY_ID.get(d.main);
+        ctx.mainCount[r.main] = (ctx.mainCount[r.main] || 0) + 1;
+        ctx.genreCount[r.genre] = (ctx.genreCount[r.genre] || 0) + 1;
+        ctx.roleCount[r.role] = (ctx.roleCount[r.role] || 0) + 1;
+        if (r.main === 'fish') ctx.hasFish = true;
+        if (Math.abs(i - index) === 1) ctx.neighbors.push(r);
+    });
+    return ctx;
+}
+
+function pickPlanDay(plan, index, date, pool) {
+    const ctx = planContext(plan, index);
+    ctx.weekday = weekdayOf(date);
+    ctx.remaining = plan.length - index;
+    const used = new Set(plan.filter((d, i) => d && i !== index).map(d => d.main));
+    const candidates = pool.filter(r => !used.has(r.id));
+    const main = weightedPick(candidates, r => planWeight(r, ctx)) || candidates[0];
+    if (!main) return null;
+    let sides = [];
+    if (weekOptions.withSides) {
+        const usedSides = new Set(plan.filter((d, i) => d && i !== index).flatMap(d => d.sides));
+        sides = buildSet(main, usedSides).slice(1).map(r => r.id);
+    }
+    return { date, main: main.id, sides };
+}
+
+function generateWeek() {
+    const { ok, counts } = applyFilters(RECIPES.filter(r => MAIN_DISH_ROLES.includes(r.role)));
+    if (ok.length < weekOptions.days) {
+        weekResult.innerHTML = '';
+        renderRecipes([], weekResult, { notice: exclusionNotice(counts), emptyHint: emptyHint(counts) });
+        return;
+    }
+    const start = dateStr();
+    const plan = new Array(weekOptions.days).fill(null);
+    for (let i = 0; i < plan.length; i++) {
+        plan[i] = pickPlanDay(plan, i, addDays(start, i), ok);
+    }
+    state.weekPlan = { withSides: weekOptions.withSides, days: plan.filter(Boolean) };
+    saveState();
+    renderWeek();
+}
+
+function rerollDay(index) {
+    const plan = state.weekPlan.days;
+    const { ok } = applyFilters(RECIPES.filter(r => MAIN_DISH_ROLES.includes(r.role)));
+    const prevWithSides = weekOptions.withSides;
+    weekOptions.withSides = state.weekPlan.withSides;
+    const next = pickPlanDay(plan, index, plan[index].date, ok);
+    weekOptions.withSides = prevWithSides;
+    if (next) {
+        plan[index] = next;
+        saveState();
+        renderWeek();
+    }
+}
+
+function renderWeekOptions() {
+    document.querySelectorAll('[data-week]').forEach(group => {
+        group.querySelectorAll('button').forEach(b => {
+            const key = group.dataset.week;
+            const value = key === 'days' ? Number(b.dataset.value) : b.dataset.value === 'set';
+            b.classList.toggle('selected', weekOptions[key] === value);
+        });
+    });
+}
+
+document.querySelectorAll('[data-week]').forEach(group => {
+    group.querySelectorAll('button').forEach(b => {
+        b.addEventListener('click', () => {
+            const key = group.dataset.week;
+            weekOptions[key] = key === 'days' ? Number(b.dataset.value) : b.dataset.value === 'set';
+            renderWeekOptions();
+        });
+    });
+});
+
+function renderWeek() {
+    renderWeekOptions();
+    weekResult.innerHTML = '';
+    const plan = state.weekPlan;
+    if (!plan) {
+        weekResult.innerHTML = '<p class="muted small center">日数と形を選んで「献立を作る」を押してください。ジャンルや主材料が続かないように組み合わせます。</p>';
+        return;
+    }
+    const mains = plan.days.map(d => RECIPE_BY_ID.get(d.main));
+    const allItems = plan.days.flatMap(d => [d.main, ...d.sides].map(id => RECIPE_BY_ID.get(id)));
+    const perDayKcal = plan.days.map(d => [d.main, ...d.sides].reduce((s, id) => s + RECIPE_BY_ID.get(id).kcal, 0));
+    const avg = Math.round(perDayKcal.reduce((a, b) => a + b, 0) / plan.days.length);
+    const countBy = (list, key, labelOf) => {
+        const c = {};
+        list.forEach(r => { const k = labelOf(r[key]); c[k] = (c[k] || 0) + 1; });
+        return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="mini-chip">${k} ${v}</span>`).join('');
+    };
+
+    const summary = document.createElement('div');
+    summary.className = 'panel week-summary';
+    summary.innerHTML = `
+        <p><strong>${plan.days.length}日分</strong>・1日あたり 約 <strong>${avg}</strong> kcal<span class="muted small">（${plan.withSides ? '主菜＋副菜・汁物' : '主菜'}／ご飯別・1人前）</span></p>
+        <div class="mini-row">${countBy(mains, 'main', k => `${MAIN_CATEGORIES[k].icon}${MAIN_CATEGORIES[k].label}`)}</div>
+        <div class="mini-row">${countBy(mains, 'genre', k => k)}</div>
+    `;
+    const actions = document.createElement('div');
+    actions.className = 'btn-row left';
+    const shop = document.createElement('button');
+    shop.className = 'primary-btn small';
+    shop.textContent = '🛒 全部の材料を買い物リストへ';
+    shop.addEventListener('click', () => addToShopping(allItems));
+    const clear = document.createElement('button');
+    clear.className = 'text-btn danger';
+    clear.textContent = 'この献立を消す';
+    clear.addEventListener('click', () => {
+        if (!confirm('1週間の献立を消しますか？')) return;
+        state.weekPlan = null;
+        saveState();
+        renderWeek();
+    });
+    actions.append(shop, clear);
+    summary.appendChild(actions);
+    weekResult.appendChild(summary);
+
+    plan.days.forEach((d, index) => {
+        const day = document.createElement('section');
+        day.className = 'week-day' + (d.date === dateStr() ? ' today' : '');
+        const head = document.createElement('div');
+        head.className = 'week-day-head';
+        head.innerHTML = `<h3>${weekLabel(d.date)}</h3><span class="muted small">約${perDayKcal[index]}kcal</span>`;
+        const reroll = document.createElement('button');
+        reroll.className = 'icon-btn';
+        reroll.title = 'この日だけ作り直す';
+        reroll.textContent = '🔄';
+        reroll.addEventListener('click', () => rerollDay(index));
+        head.appendChild(reroll);
+        day.appendChild(head);
+        const grid = document.createElement('div');
+        grid.className = 'week-cards';
+        grid.appendChild(createRecipeCard(RECIPE_BY_ID.get(d.main), { compact: true }));
+        d.sides.forEach(id => grid.appendChild(createRecipeCard(RECIPE_BY_ID.get(id), { compact: true, noSet: true })));
+        day.appendChild(grid);
+        weekResult.appendChild(day);
+    });
+}
+
+document.getElementById('start-week').addEventListener('click', generateWeek);
+
+// ---------------------------------------------------------------------
 // 初期表示
 // ---------------------------------------------------------------------
 document.getElementById('app-version').textContent =
     `v${APP_VERSION}（${APP_UPDATED.replace(/-/g, '/')} 更新）・料理 ${RECIPES.length} 品・材料 ${ALL_INGREDIENTS.length} 種類`;
+document.body.dataset.tab = 'ingredient-tab';
 applyTheme();
 renderSettings();
+renderConditionBar();
 renderInspireSummary();
 updateShoppingBadge();
