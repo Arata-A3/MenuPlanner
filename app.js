@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------
 // 保存データ（設定と食事の記録）
 // ---------------------------------------------------------------------
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 const APP_UPDATED = '2026-11-10';
 
 const STORE_KEY = 'menuPlanner.v2';
@@ -273,9 +273,9 @@ function allergenLine(r) {
         const label = ALLERGEN_BY_KEY.get(k).label;
         return mine.includes(k) ? `<strong>${label}</strong>` : label;
     }).join('・');
-    const main = r.allergens.length ? `⚠️ ${fmt(r.allergens)}` : '';
+    const main = r.allergens.length ? `<span class="allergen-main">⚠️ ${fmt(r.allergens)}</span>` : '';
     const seasoning = r.seasoningAllergens.length
-        ? `<span class="seasoning-allergens">調味料に含まれやすい: ${fmt(r.seasoningAllergens)}</span>`
+        ? `<span class="seasoning-allergens">調味料: ${fmt(r.seasoningAllergens)}</span>`
         : '';
     return `<p class="recipe-allergens">${main}${seasoning}</p>`;
 }
@@ -290,32 +290,35 @@ function isEatenToday(id) {
 }
 
 function createRecipeCard(recipe, opts = {}) {
-    const card = document.createElement('div');
+    const card = document.createElement('article');
     card.className = 'recipe-card' + (opts.compact ? ' compact' : '');
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${recipe.name} レシピ ${state.settings.servings}人分`)}`;
     const eaten = isEatenToday(recipe.id);
     const canMakeSet = ['K', 'M', 'N'].includes(recipe.role) && !opts.noSet;
+    const meta = [
+        `<span class="role-dot role-${recipe.role}"></span>${ROLE_LABELS[recipe.role]}`,
+        recipe.genre,
+        `⏱${recipe.time}`,
+        `<span title="手間">手間${difficultyStars(recipe.diff)}</span>`,
+    ];
+    if (recipe.pop === 3) meta.push('<span class="rare">レア</span>');
 
     card.innerHTML = `
         ${opts.reason ? `<div class="reason-chip">${esc(opts.reason)}</div>` : ''}
-        <h3>${esc(recipe.name)}</h3>
-        <div class="recipe-tags">
-            <span class="badge">${recipe.genre}</span>
-            <span class="badge role-${recipe.role}">${ROLE_LABELS[recipe.role]}</span>
-            <span class="badge">⏱ ${recipe.time}</span>
-            <span class="badge" title="手間">手間 ${difficultyStars(recipe.diff)}</span>
-            ${recipe.pop === 3 ? '<span class="badge minor">レア</span>' : ''}
+        <div class="card-head">
+            <h3>${esc(recipe.name)}</h3>
+            <span class="kcal" title="1人前の目安${recipe.role === 'K' ? '（ご飯別）' : ''}">${recipe.kcal}<small>kcal</small></span>
         </div>
-        <p class="recipe-kcal">約 <strong>${recipe.kcal}</strong> kcal<span class="muted">（1人前の目安${recipe.role === 'K' ? '・ご飯別' : ''}）</span></p>
+        <p class="card-meta">${meta.join('<span class="sep">·</span>')}</p>
+        ${opts.matchInfo ? `<p class="match-info">${esc(opts.matchInfo)}</p>` : ''}
         <div class="nutri-row">${nutrientChips(recipe)}</div>
         ${allergenLine(recipe)}
-        ${opts.compact ? '' : `<p class="recipe-ingredients"><strong>材料:</strong> ${recipe.ingredients.map(esc).join(', ')}</p>`}
-        ${opts.matchInfo ? `<p class="match-info">${esc(opts.matchInfo)}</p>` : ''}
+        ${opts.compact ? '' : `<details class="card-ings"><summary>材料（${recipe.ingredients.length}）</summary><p>${recipe.ingredients.map(esc).join('、')}</p></details>`}
         <div class="card-actions">
-            <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" class="search-recipe-btn">レシピ検索 🔍</a>
-            <button class="eat-btn" ${eaten ? 'disabled' : ''}>${eaten ? '✓ 記録済み' : '食べた！🍽️'}</button>
-            ${canMakeSet ? '<button class="set-btn">🍱 献立セット</button>' : ''}
-            <button class="shop-btn" title="材料を買い物リストに追加">🛒 買い物</button>
+            <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" class="act search-recipe-btn" title="レシピを検索"><span class="act-icon">🔍</span><span>レシピ</span></a>
+            <button class="act eat-btn" ${eaten ? 'disabled' : ''} title="今日食べた料理として記録"><span class="act-icon">${eaten ? '✓' : '🍽️'}</span><span class="eat-label">${eaten ? '記録済み' : '食べた'}</span></button>
+            ${canMakeSet ? '<button class="act set-btn" title="副菜・汁物を組み合わせる"><span class="act-icon">🍱</span><span>献立</span></button>' : ''}
+            <button class="act shop-btn" title="材料を買い物リストに追加"><span class="act-icon">🛒</span><span>買う</span></button>
         </div>
     `;
     card.querySelector('.shop-btn').addEventListener('click', () => addToShopping([recipe]));
@@ -324,7 +327,8 @@ function createRecipeCard(recipe, opts = {}) {
     eatBtn.addEventListener('click', () => {
         addHistory(recipe.id, dateStr());
         eatBtn.disabled = true;
-        eatBtn.textContent = '✓ 記録済み';
+        eatBtn.querySelector('.act-icon').textContent = '✓';
+        eatBtn.querySelector('.eat-label').textContent = '記録済み';
         showToast(`「${recipe.name}」を今日の記録に追加しました`);
     });
     if (canMakeSet) {
@@ -333,7 +337,8 @@ function createRecipeCard(recipe, opts = {}) {
     return card;
 }
 
-const PAGE_SIZE = 24;
+// スマホでは一度に出す枚数を少なめに
+const PAGE_SIZE = window.matchMedia('(max-width: 600px)').matches ? 12 : 24;
 
 /** 料理リストを表示（多いときは「もっと見る」で追加表示） */
 function renderRecipes(recipesArray, container, opts = {}) {
@@ -410,6 +415,7 @@ tabBtns.forEach(btn => {
         btn.classList.add('active');
         tabPanes.forEach(pane => pane.classList.remove('active'));
         document.getElementById(btn.dataset.target).classList.add('active');
+        window.scrollTo({ top: 0 });
         if (btn.dataset.target === 'history-tab') renderHistory();
         if (btn.dataset.target === 'inspire-tab') renderInspireSummary();
     });
@@ -441,62 +447,97 @@ const ingredientCategories = {
 
 const allIngredients = ALL_INGREDIENTS;
 const ingredientContainer = document.getElementById('ingredient-list');
+const ingredientCats = document.getElementById('ingredient-cats');
+const ingredientFilter = document.getElementById('ingredient-filter');
+const selectedChips = document.getElementById('selected-chips');
+const searchIngBtn = document.getElementById('search-by-ingredient');
 const selectedIngredients = new Set();
-const categorized = new Set(Object.values(ingredientCategories).flat());
-const shownIngredients = new Set();
+
+// カテゴリごとの材料（どのカテゴリにも入らないものは「その他」へ）
+const ingredientGroups = (() => {
+    const shown = new Set();
+    const groups = [];
+    Object.entries(ingredientCategories).forEach(([catName, list]) => {
+        const items = catName === '🍶 その他'
+            ? allIngredients.filter(i => !shown.has(i))
+            : [...new Set(list)].filter(i => allIngredients.includes(i) && !shown.has(i));
+        items.forEach(i => shown.add(i));
+        if (items.length) groups.push({ name: catName, items });
+    });
+    return groups;
+})();
+let activeCategory = ingredientGroups[0].name;
 
 function makeIngredientTag(ing) {
     const tag = document.createElement('button');
     tag.type = 'button';
-    tag.className = 'ingredient-tag';
+    tag.className = 'ingredient-tag' + (selectedIngredients.has(ing) ? ' selected' : '');
     tag.textContent = ing;
-    tag.addEventListener('click', () => {
-        tag.classList.toggle('selected');
-        if (tag.classList.contains('selected')) selectedIngredients.add(ing);
-        else selectedIngredients.delete(ing);
-        updateSelectedCount();
-    });
+    tag.setAttribute('aria-pressed', String(selectedIngredients.has(ing)));
+    tag.addEventListener('click', () => toggleIngredient(ing));
     return tag;
 }
 
-Object.entries(ingredientCategories).forEach(([catName, list]) => {
-    const items = catName === '🍶 その他'
-        ? allIngredients.filter(i => !categorized.has(i))
-        : [...new Set(list)].filter(i => allIngredients.includes(i) && !shownIngredients.has(i));
-    items.forEach(i => shownIngredients.add(i));
-    if (items.length === 0) return;
-
-    const groupDiv = document.createElement('div');
-    groupDiv.className = 'ingredient-group';
-    const groupTitle = document.createElement('h3');
-    groupTitle.className = 'ingredient-group-title';
-    groupTitle.textContent = catName;
-    const groupTagsDiv = document.createElement('div');
-    groupTagsDiv.className = 'ingredient-group-tags';
-    // 量が多い・選ぶことが少ないグループは最初は閉じておく
-    if (['🍶 その他', '🧂 調味料', '🍎 果物・ナッツ'].includes(catName)) {
-        groupTagsDiv.classList.add('collapsed');
-        groupTitle.classList.add('collapsed');
-    }
-    groupTitle.addEventListener('click', () => {
-        groupTagsDiv.classList.toggle('collapsed');
-        groupTitle.classList.toggle('collapsed');
-    });
-    items.forEach(ing => groupTagsDiv.appendChild(makeIngredientTag(ing)));
-    groupDiv.appendChild(groupTitle);
-    groupDiv.appendChild(groupTagsDiv);
-    ingredientContainer.appendChild(groupDiv);
-});
-
-const searchIngBtn = document.getElementById('search-by-ingredient');
-function updateSelectedCount() {
-    searchIngBtn.textContent = selectedIngredients.size
-        ? `この材料（${selectedIngredients.size}つ）で作れる料理を探す`
-        : 'この材料で作れる料理を探す';
+function toggleIngredient(ing) {
+    if (selectedIngredients.has(ing)) selectedIngredients.delete(ing);
+    else selectedIngredients.add(ing);
+    renderIngredientTags();
+    renderSelectedChips();
 }
 
+function renderIngredientCats() {
+    ingredientCats.innerHTML = '';
+    const searching = ingredientFilter.value.trim() !== '';
+    ingredientGroups.forEach(g => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cat-chip' + (g.name === activeCategory && !searching ? ' active' : '');
+        b.setAttribute('role', 'tab');
+        const picked = g.items.filter(i => selectedIngredients.has(i)).length;
+        b.innerHTML = `${esc(g.name)}${picked ? `<span class="cat-count">${picked}</span>` : ''}`;
+        b.addEventListener('click', () => {
+            activeCategory = g.name;
+            ingredientFilter.value = '';
+            renderIngredientTags();
+        });
+        ingredientCats.appendChild(b);
+    });
+}
+
+function renderIngredientTags() {
+    const q = ingredientFilter.value.trim();
+    const items = q
+        ? allIngredients.filter(i => i.includes(q))
+        : ingredientGroups.find(g => g.name === activeCategory).items;
+    ingredientContainer.innerHTML = '';
+    if (items.length === 0) {
+        ingredientContainer.innerHTML = '<p class="muted small">見つかりませんでした</p>';
+    }
+    items.forEach(ing => ingredientContainer.appendChild(makeIngredientTag(ing)));
+    renderIngredientCats();
+}
+
+function renderSelectedChips() {
+    selectedChips.innerHTML = '';
+    if (selectedIngredients.size === 0) {
+        selectedChips.innerHTML = '<span class="muted small">材料をタップして選んでね（選ばずに探すと全部から）</span>';
+    }
+    selectedIngredients.forEach(ing => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'selected-chip';
+        b.textContent = `${ing} ✕`;
+        b.title = '選択をはずす';
+        b.addEventListener('click', () => toggleIngredient(ing));
+        selectedChips.appendChild(b);
+    });
+    searchIngBtn.textContent = selectedIngredients.size ? `${selectedIngredients.size}つの材料で探す` : '料理を探す';
+}
+
+ingredientFilter.addEventListener('input', renderIngredientTags);
+
 let ingredientSearched = false;
-function runIngredientSearch() {
+function runIngredientSearch(scroll) {
     ingredientSearched = true;
     const base = selectedIngredients.size === 0
         ? RECIPES
@@ -506,16 +547,20 @@ function runIngredientSearch() {
     ok.sort((a, b) => (matchCount(b) - matchCount(a)) || (baseWeight(b) - baseWeight(a)));
     renderRecipes(ok, 'ingredient-result', {
         notice: exclusionNotice(counts), emptyHint: emptyHint(counts),
-        matchInfo: selectedIngredients.size ? r => `選んだ材料のうち ${matchCount(r)} つを使用` : null,
+        matchInfo: selectedIngredients.size ? r => `✔ 選んだ材料を ${matchCount(r)} つ使用` : null,
     });
+    if (scroll === true) document.getElementById('ingredient-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-searchIngBtn.addEventListener('click', runIngredientSearch);
+searchIngBtn.addEventListener('click', () => runIngredientSearch(true));
 
 document.getElementById('clear-ingredients').addEventListener('click', () => {
     selectedIngredients.clear();
-    document.querySelectorAll('.ingredient-tag.selected').forEach(t => t.classList.remove('selected'));
-    updateSelectedCount();
+    renderIngredientTags();
+    renderSelectedChips();
 });
+
+renderIngredientTags();
+renderSelectedChips();
 
 // ---------------------------------------------------------------------
 // 2. ランダム
@@ -1087,6 +1132,19 @@ function renderSettings() {
 
     const active = s.allergens.length + s.dislikes.length;
     document.getElementById('settings-badge').textContent = active ? String(active) : '';
+
+    // 折りたたんだ見出しに今の設定を表示
+    const label = (key, value) => {
+        const b = document.querySelector(`[data-setting="${key}"] button[data-value="${value}"]`);
+        return b ? b.textContent : '';
+    };
+    const allergyNames = s.allergens.map(k => ALLERGEN_BY_KEY.get(k).label);
+    document.getElementById('sum-allergy').textContent = allergyNames.length
+        ? `${allergyNames.slice(0, 4).join('・')}${allergyNames.length > 4 ? ` ほか${allergyNames.length - 4}` : ''}`
+        : 'なし';
+    document.getElementById('sum-dislike').textContent = s.dislikes.length ? s.dislikes.slice(0, 3).join('・') + (s.dislikes.length > 3 ? '…' : '') : 'なし';
+    document.getElementById('sum-suggest').textContent = `除外 ${label('recentDays', s.recentDays)}・マイナー ${label('minor', s.minor)}`;
+    document.getElementById('sum-display').textContent = `${s.servings}人・${label('theme', s.theme)}`;
 }
 
 function settingsChanged() {

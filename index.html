@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>今日の献立メーカー🍳</title>
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon.png">
@@ -21,83 +21,110 @@
 </head>
 
 <body>
-    <header>
-        <h1>今日の献立メーカー🍳</h1>
-        <p>何を作るか迷ったときに！</p>
+    <header class="app-header">
+        <div class="brand">
+            <img src="icon-192.png" alt="" class="brand-icon" width="40" height="40">
+            <div>
+                <h1>今日の献立メーカー</h1>
+                <p class="tagline">何を作るか迷ったときに</p>
+            </div>
+        </div>
         <div class="header-actions">
-            <button id="open-shopping" class="settings-btn" aria-label="買い物リスト">🛒 買い物リスト<span id="shopping-badge" class="badge-count"></span></button>
-            <button id="open-settings" class="settings-btn" aria-label="設定">⚙️ 設定<span id="settings-badge" class="badge-count"></span></button>
+            <button id="open-shopping" class="pill-btn" aria-label="買い物リスト">
+                <span aria-hidden="true">🛒</span><span class="pill-label">買い物</span><span id="shopping-badge" class="badge-count"></span>
+            </button>
+            <button id="open-settings" class="pill-btn" aria-label="設定">
+                <span aria-hidden="true">⚙️</span><span class="pill-label">設定</span><span id="settings-badge" class="badge-count"></span>
+            </button>
         </div>
     </header>
 
-    <main>
-        <div class="tabs">
-            <button class="tab-btn active" data-target="ingredient-tab">🥒 材料から</button>
-            <button class="tab-btn" data-target="random-tab">🎲 ランダム</button>
-            <button class="tab-btn" data-target="question-tab">💬 質問から</button>
-            <button class="tab-btn" data-target="inspire-tab">💡 ひらめき</button>
-            <button class="tab-btn" data-target="history-tab">📅 記録</button>
-        </div>
+    <nav class="tabs" aria-label="メニュー">
+        <button class="tab-btn active" data-target="ingredient-tab"><span class="tab-icon">🥒</span><span class="tab-label">材料から</span></button>
+        <button class="tab-btn" data-target="random-tab"><span class="tab-icon">🎲</span><span class="tab-label">ランダム</span></button>
+        <button class="tab-btn" data-target="question-tab"><span class="tab-icon">💬</span><span class="tab-label">質問</span></button>
+        <button class="tab-btn" data-target="inspire-tab"><span class="tab-icon">💡</span><span class="tab-label">ひらめき</span></button>
+        <button class="tab-btn" data-target="history-tab"><span class="tab-icon">📅</span><span class="tab-label">記録</span></button>
+    </nav>
 
-        <div class="tab-content">
-            <!-- 材料から絞り込む -->
-            <section id="ingredient-tab" class="tab-pane active">
-                <h2>冷蔵庫にある材料を選択</h2>
-                <div id="ingredient-list" class="tag-container"></div>
-                <div class="btn-row">
-                    <button id="search-by-ingredient" class="primary-btn">この材料で作れる料理を探す</button>
-                    <button id="clear-ingredients" class="secondary-btn">選択をクリア</button>
+    <main class="tab-content">
+        <!-- 材料から絞り込む -->
+        <section id="ingredient-tab" class="tab-pane active">
+            <div class="pane-head">
+                <h2>冷蔵庫にある材料は？</h2>
+                <p>選んだ材料をたくさん使う料理から順に出します</p>
+            </div>
+            <input id="ingredient-filter" class="search-input" type="search" placeholder="🔍 材料名で探す（例: 豚肉、きのこ）" autocomplete="off">
+            <div id="ingredient-cats" class="cat-chips" role="tablist" aria-label="材料の種類"></div>
+            <div id="ingredient-list" class="ingredient-tags"></div>
+
+            <div class="selection-bar">
+                <div id="selected-chips" class="selected-chips"></div>
+                <div class="selection-actions">
+                    <button id="clear-ingredients" class="text-btn">クリア</button>
+                    <button id="search-by-ingredient" class="primary-btn">料理を探す</button>
                 </div>
-                <div id="ingredient-result" class="result-area"></div>
-            </section>
+            </div>
+            <div id="ingredient-result" class="result-area"></div>
+        </section>
 
-            <!-- ランダムで決める -->
-            <section id="random-tab" class="tab-pane">
+        <!-- ランダムで決める -->
+        <section id="random-tab" class="tab-pane">
+            <div class="pane-head">
                 <h2>運命のルーレット</h2>
-                <div class="random-machine">
-                    <div id="random-display" class="random-display">ここになにかが出ます！</div>
-                    <p class="muted small">定番の料理ほど出やすくなっています（設定で変更できます）</p>
-                    <button id="start-random" class="primary-btn pulse">献立をルーレットで決める！</button>
-                    <div id="random-result" class="result-area"></div>
-                </div>
-            </section>
+                <p>定番の料理ほど出やすくなっています（設定で変更できます）</p>
+            </div>
+            <div id="random-display" class="random-display">ここになにかが出ます！</div>
+            <button id="start-random" class="primary-btn wide">ルーレットを回す 🎲</button>
+            <div id="random-result" class="result-area"></div>
+        </section>
 
-            <!-- 質問で決める -->
-            <section id="question-tab" class="tab-pane">
-                <div id="question-container">
-                    <p id="question-progress" class="muted small"></p>
+        <!-- 質問で決める -->
+        <section id="question-tab" class="tab-pane">
+            <div id="question-container">
+                <div class="pane-head">
+                    <p id="question-progress" class="step"></p>
                     <h2 id="question-text">今日の気分は？</h2>
-                    <div id="answer-buttons" class="answer-buttons"></div>
                 </div>
-                <div id="question-result" class="result-area hidden"></div>
-                <button id="reset-question" class="secondary-btn hidden">もう一度診断する</button>
-            </section>
+                <div id="answer-buttons" class="answer-buttons"></div>
+            </div>
+            <div id="question-result" class="result-area hidden"></div>
+            <button id="reset-question" class="secondary-btn hidden">もう一度診断する</button>
+        </section>
 
-            <!-- ひらめき -->
-            <section id="inspire-tab" class="tab-pane">
+        <!-- ひらめき -->
+        <section id="inspire-tab" class="tab-pane">
+            <div class="pane-head">
                 <h2>思いつかない日のひらめき</h2>
-                <p class="lead">最近食べたもの・足りない栄養・季節から、<br>いつもと違うメニューを理由つきで提案します。</p>
-                <div id="inspire-summary" class="info-box"></div>
-                <button id="start-inspire" class="primary-btn pulse">ひらめきをもらう 💡</button>
-                <div id="inspire-result" class="result-area"></div>
-            </section>
+                <p>最近食べたもの・足りない栄養・季節から、いつもと違うメニューを理由つきで提案します</p>
+            </div>
+            <div id="inspire-summary" class="info-box"></div>
+            <button id="start-inspire" class="primary-btn wide">ひらめきをもらう 💡</button>
+            <div id="inspire-result" class="result-area"></div>
+        </section>
 
-            <!-- 記録 -->
-            <section id="history-tab" class="tab-pane">
+        <!-- 記録 -->
+        <section id="history-tab" class="tab-pane">
+            <div class="pane-head">
                 <h2>食べたものの記録</h2>
-                <div class="history-form">
-                    <input id="history-input" list="recipe-options" placeholder="料理名を入力（例: カレーライス）" autocomplete="off">
-                    <datalist id="recipe-options"></datalist>
-                    <input id="history-date" type="date">
-                    <button id="history-add" class="primary-btn small">記録する</button>
-                </div>
-                <h3 class="sub-heading">🥗 最近7日間の栄養バランス</h3>
+                <p>「食べた」で記録すると、除外や栄養バランスに使われます</p>
+            </div>
+            <div class="history-form">
+                <input id="history-input" list="recipe-options" placeholder="料理名（例: カレーライス）" autocomplete="off">
+                <datalist id="recipe-options"></datalist>
+                <input id="history-date" type="date" aria-label="日付">
+                <button id="history-add" class="primary-btn small">記録</button>
+            </div>
+            <div class="panel">
+                <h3 class="panel-title">🥗 最近7日間の栄養バランス</h3>
                 <div id="balance-area" class="balance-area"></div>
-                <h3 class="sub-heading">📅 最近30日間の記録</h3>
+            </div>
+            <div class="panel">
+                <h3 class="panel-title">📅 最近30日間</h3>
                 <div id="history-list" class="history-list"></div>
-                <button id="history-clear" class="secondary-btn small">記録をすべて消す</button>
-            </section>
-        </div>
+                <button id="history-clear" class="text-btn danger">記録をすべて消す</button>
+            </div>
+        </section>
     </main>
 
     <footer class="app-footer">
@@ -110,91 +137,95 @@
             <h2>⚙️ 設定</h2>
             <button id="settings-close" class="icon-btn" aria-label="閉じる">✕</button>
         </div>
+        <div class="dialog-body">
+            <details class="setting-section" open>
+                <summary><span>🚫 アレルギー</span><span id="sum-allergy" class="sum-value"></span></summary>
+                <div class="setting-inner">
+                    <p class="muted small">選んだ食材を含む料理は表示しません。</p>
+                    <div id="allergen-options"></div>
+                    <h4>調味料の扱い</h4>
+                    <div class="segmented" data-setting="allergenScope">
+                        <button data-value="all">調味料も含めて除外</button>
+                        <button data-value="main">調味料は除く</button>
+                    </div>
+                    <p class="muted small">「調味料も含めて除外」は、醤油・味噌・だし・ごま油・コンソメ・カレールーなど、ふつう使われる調味料に含まれやすいものまで避けます（安全寄り）。「調味料は除く」は、料理そのものの材料だけで判定します。</p>
+                    <p class="caution">※ 材料と料理名から推定しています。実際の商品やお店の料理では違うことがあるので、必ず原材料表示を確認してください。</p>
+                </div>
+            </details>
 
-        <section class="setting-section">
-            <h3>🚫 アレルギー</h3>
-            <p class="muted small">選んだ食材を含む料理は表示しません。</p>
-            <div id="allergen-options"></div>
-            <h4>調味料の扱い</h4>
-            <div class="segmented" data-setting="allergenScope">
-                <button data-value="all">調味料も含めて除外</button>
-                <button data-value="main">調味料は除く</button>
-            </div>
-            <p class="muted small">「調味料も含めて除外」は、醤油・味噌・だし・ごま油・コンソメ・カレールーなど、ふつう使われる調味料に含まれやすいものまで避けます（安全寄り）。「調味料は除く」は、料理そのものの材料だけで判定します。</p>
-            <p class="caution">※ 材料と料理名から推定しています。実際の商品やお店の料理では違うことがあるので、必ず原材料表示を確認してください。</p>
-        </section>
+            <details class="setting-section">
+                <summary><span>🙅 苦手な食材</span><span id="sum-dislike" class="sum-value"></span></summary>
+                <div class="setting-inner">
+                    <p class="muted small">入力した言葉を材料・料理名に含む料理を表示しません。</p>
+                    <div class="inline-form">
+                        <input id="dislike-input" placeholder="例: パクチー、セロリ">
+                        <button id="dislike-add" class="primary-btn small">追加</button>
+                    </div>
+                    <div id="dislike-chips" class="chip-options"></div>
+                </div>
+            </details>
 
-        <section class="setting-section">
-            <h3>🙅 苦手な食材</h3>
-            <p class="muted small">入力した言葉を材料・料理名に含む料理を表示しません。</p>
-            <div class="inline-form">
-                <input id="dislike-input" placeholder="例: パクチー、セロリ">
-                <button id="dislike-add" class="primary-btn small">追加</button>
-            </div>
-            <div id="dislike-chips" class="chip-options"></div>
-        </section>
+            <details class="setting-section">
+                <summary><span>🧭 提案のしかた</span><span id="sum-suggest" class="sum-value"></span></summary>
+                <div class="setting-inner">
+                    <h4>最近食べた料理を除外</h4>
+                    <div class="segmented" data-setting="recentDays">
+                        <button data-value="0">しない</button>
+                        <button data-value="3">3日</button>
+                        <button data-value="7">1週間</button>
+                        <button data-value="14">2週間</button>
+                    </div>
+                    <h4>マイナーな料理</h4>
+                    <div class="segmented" data-setting="minor">
+                        <button data-value="never">出さない</button>
+                        <button data-value="rare">たまに</button>
+                        <button data-value="normal">ふつうに</button>
+                    </div>
+                    <h4>手間のかかる料理</h4>
+                    <div class="segmented" data-setting="hard">
+                        <button data-value="never">出さない</button>
+                        <button data-value="rare">たまに</button>
+                        <button data-value="normal">ふつうに</button>
+                    </div>
+                </div>
+            </details>
 
-        <section class="setting-section">
-            <h3>🔁 最近食べた料理を除外</h3>
-            <div class="segmented" data-setting="recentDays">
-                <button data-value="0">しない</button>
-                <button data-value="3">3日</button>
-                <button data-value="7">1週間</button>
-                <button data-value="14">2週間</button>
-            </div>
-        </section>
+            <details class="setting-section">
+                <summary><span>👪 人数・表示</span><span id="sum-display" class="sum-value"></span></summary>
+                <div class="setting-inner">
+                    <h4>何人分作る？</h4>
+                    <div class="segmented" data-setting="servings">
+                        <button data-value="1">1人</button>
+                        <button data-value="2">2人</button>
+                        <button data-value="3">3人</button>
+                        <button data-value="4">4人</button>
+                        <button data-value="5">5人</button>
+                        <button data-value="6">6人</button>
+                    </div>
+                    <p class="muted small">レシピ検索・献立セットの合計カロリー・買い物リストに使います。</p>
+                    <h4>画面の明るさ</h4>
+                    <div class="segmented" data-setting="theme">
+                        <button data-value="auto">端末に合わせる</button>
+                        <button data-value="light">ライト</button>
+                        <button data-value="dark">ダーク</button>
+                    </div>
+                </div>
+            </details>
 
-        <section class="setting-section">
-            <h3>🧭 マイナーな料理</h3>
-            <div class="segmented" data-setting="minor">
-                <button data-value="never">出さない</button>
-                <button data-value="rare">たまに</button>
-                <button data-value="normal">ふつうに</button>
-            </div>
-        </section>
+            <details class="setting-section">
+                <summary><span>💾 バックアップ</span></summary>
+                <div class="setting-inner">
+                    <p class="muted small">設定・食事の記録・買い物リストはこの端末のブラウザにだけ保存されます。機種変更の前に書き出しておき、新しい端末で読み込んでください。</p>
+                    <div class="btn-row left">
+                        <button id="backup-export" class="secondary-btn small">書き出す（ファイル保存）</button>
+                        <button id="backup-import" class="secondary-btn small">読み込む</button>
+                        <input id="backup-file" type="file" accept="application/json,.json" hidden>
+                    </div>
+                </div>
+            </details>
 
-        <section class="setting-section">
-            <h3>🔥 手間のかかる料理</h3>
-            <div class="segmented" data-setting="hard">
-                <button data-value="never">出さない</button>
-                <button data-value="rare">たまに</button>
-                <button data-value="normal">ふつうに</button>
-            </div>
-        </section>
-
-        <section class="setting-section">
-            <h3>👪 何人分作る？</h3>
-            <div class="segmented" data-setting="servings">
-                <button data-value="1">1人</button>
-                <button data-value="2">2人</button>
-                <button data-value="3">3人</button>
-                <button data-value="4">4人</button>
-                <button data-value="5">5人</button>
-                <button data-value="6">6人</button>
-            </div>
-            <p class="muted small">レシピ検索・献立セットの合計カロリー・買い物リストに使います。</p>
-        </section>
-
-        <section class="setting-section">
-            <h3>🌙 画面の明るさ</h3>
-            <div class="segmented" data-setting="theme">
-                <button data-value="auto">端末に合わせる</button>
-                <button data-value="light">ライト</button>
-                <button data-value="dark">ダーク</button>
-            </div>
-        </section>
-
-        <section class="setting-section">
-            <h3>💾 バックアップ</h3>
-            <p class="muted small">設定・食事の記録・買い物リストはこの端末のブラウザにだけ保存されます。機種変更の前に書き出しておき、新しい端末で読み込んでください。</p>
-            <div class="btn-row left">
-                <button id="backup-export" class="secondary-btn small">書き出す（ファイル保存）</button>
-                <button id="backup-import" class="secondary-btn small">読み込む</button>
-                <input id="backup-file" type="file" accept="application/json,.json" hidden>
-            </div>
-        </section>
-
-        <p class="muted small">栄養・カロリーは材料からのざっくりした目安です。</p>
+            <p class="muted small note">栄養・カロリーは材料からのざっくりした目安です。</p>
+        </div>
     </dialog>
 
     <!-- 買い物リスト -->
@@ -203,11 +234,11 @@
             <h2>🛒 買い物リスト</h2>
             <button id="shopping-close" class="icon-btn" aria-label="閉じる">✕</button>
         </div>
-        <div id="shopping-body"></div>
-        <div class="btn-row">
+        <div id="shopping-body" class="dialog-body"></div>
+        <div class="dialog-foot">
             <button id="shopping-share" class="primary-btn small">共有・コピー 📋</button>
             <button id="shopping-clear-checked" class="secondary-btn small">チェック済みを消す</button>
-            <button id="shopping-clear" class="secondary-btn small">全部消す</button>
+            <button id="shopping-clear" class="text-btn danger">全部消す</button>
         </div>
     </dialog>
 
@@ -217,9 +248,13 @@
             <h2 id="set-title">献立セット</h2>
             <button id="set-close" class="icon-btn" aria-label="閉じる">✕</button>
         </div>
-        <p class="muted small">足りない栄養を補える副菜・汁物を組み合わせました。</p>
-        <div id="set-body"></div>
-        <button id="set-reroll" class="secondary-btn small">別の組み合わせ 🔄</button>
+        <div class="dialog-body">
+            <p class="muted small">足りない栄養を補える副菜・汁物を組み合わせました。</p>
+            <div id="set-body"></div>
+        </div>
+        <div class="dialog-foot">
+            <button id="set-reroll" class="secondary-btn small">別の組み合わせ 🔄</button>
+        </div>
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
