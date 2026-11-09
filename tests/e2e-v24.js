@@ -64,7 +64,7 @@ const server = http.createServer((req, res) => {
     });
     // 同じ「足りない数」の中ではキャベツを使う料理が先に並ぶ
     const group = infos.filter(t => (t.includes('全部そろってる') ? 0 : 1) === firstMissing);
-    const flags = group.map(t => t.includes('⏰キャベツ'));
+    const flags = group.map(t => t.includes('キャベツを使える'));
     const sorted = flags.every((f, i) => i === 0 || !f || flags[i - 1]);
     check(`キャベツを使う料理が同じ条件の中で先に並ぶ（先頭 ${flags.filter(Boolean).length} 品）`, flags[0] && sorted);
     await page.screenshot({ path: path.join(OUT, 'v24-1-fridge.png') });
@@ -113,12 +113,12 @@ const server = http.createServer((req, res) => {
     // --- 共有（PC ではコピー）
     await page.click('.week-summary button:has-text("共有")');
     const clip = await page.evaluate(() => navigator.clipboard.readText());
-    check(`共有テキスト（1行目: ${clip.split('\n')[0]}）`, clip.startsWith('📆 献立') && clip.split('\n').length >= 9 && clip.includes('今日の献立メーカー'));
+    check(`共有テキスト（1行目: ${clip.split('\n')[0]}）`, clip.startsWith('【献立】') && clip.split('\n').length >= 9 && clip.includes('今日の献立メーカー'));
 
     await page.locator('.week-day .set-btn').first().click();
     await page.click('#set-body button:has-text("共有")');
     const clip2 = await page.evaluate(() => navigator.clipboard.readText());
-    check('献立セットの共有テキスト', clip2.startsWith('🍱 今日の献立') && clip2.includes('主菜') || clip2.includes('主食系'));
+    check('献立セットの共有テキスト', clip2.startsWith('【今日の献立】') && clip2.includes('主菜') || clip2.includes('主食系'));
     await page.click('#set-close');
 
     // --- 更新履歴・新しくなったこと

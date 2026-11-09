@@ -486,12 +486,12 @@ const ROLE_LABELS = {
 // 材料から「どの栄養が多めか」をざっくり見積もるための対応表。
 // 薬味として少量使われがちな材料は効き目を半分にする（GARNISH）。
 const NUTRIENTS = [
-    { key: 'protein', label: 'たんぱく質', short: 'たんぱく', icon: '💪' },
-    { key: 'carb', label: '炭水化物', short: '炭水化物', icon: '🍚' },
-    { key: 'veg', label: '野菜・ビタミン', short: '野菜', icon: '🥦' },
-    { key: 'fiber', label: '食物繊維', short: '繊維', icon: '🌾' },
-    { key: 'calcium', label: 'カルシウム', short: 'Ca', icon: '🦴' },
-    { key: 'iron', label: '鉄分', short: '鉄', icon: '🩸' },
+    { key: 'protein', label: 'たんぱく質', short: 'たんぱく', icon: 'dumbbell' },
+    { key: 'carb', label: '炭水化物', short: '炭水化物', icon: 'rice' },
+    { key: 'veg', label: '野菜・ビタミン', short: '野菜', icon: 'sprout' },
+    { key: 'fiber', label: '食物繊維', short: '繊維', icon: 'wheat' },
+    { key: 'calcium', label: 'カルシウム', short: 'Ca', icon: 'milk' },
+    { key: 'iron', label: '鉄分', short: '鉄', icon: 'drop' },
 ];
 
 // 材料の分類（栄養・主材料の判定・材料選択画面で使う）
@@ -1058,10 +1058,10 @@ const PFC_TEXT = `
 
 // --- 条件フィルター ------------------------------------------------------
 const CONDITIONS = [
-    { key: 'mild', label: '🧒 辛くない', desc: '唐辛子・キムチなど辛い料理を除く' },
-    { key: 'micro', label: '🔌 レンジ・火なし', desc: '包丁と電子レンジくらいで作れる料理（目安）' },
-    { key: 'cheap', label: '💰 節約', desc: '高い食材を使わず、材料が少なめの料理' },
-    { key: 'quick', label: '⏱ 時短', desc: '調理時間が短めの料理' },
+    { key: 'mild', icon: 'no-chili', label: '辛くない', desc: '唐辛子・キムチなど辛い料理を除く' },
+    { key: 'micro', icon: 'microwave', label: 'レンジ・火なし', desc: '包丁と電子レンジくらいで作れる料理（目安）' },
+    { key: 'cheap', icon: 'coin', label: '節約', desc: '高い食材を使わず、材料が少なめの料理' },
+    { key: 'quick', icon: 'clock', label: '時短', desc: '調理時間が短めの料理' },
 ];
 
 const SPICY_INGS = ['豆板醤', 'コチュジャン', 'ラー油', 'キムチ', '白菜キムチ', '大根キムチ', 'きゅうりキムチ',

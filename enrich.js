@@ -9,10 +9,10 @@
 // =====================================================================
 
 const MAIN_CATEGORIES = {
-    meat: { label: '肉', icon: '🍖' },
-    fish: { label: '魚介', icon: '🐟' },
-    eggsoy: { label: '卵・大豆', icon: '🥚' },
-    veg: { label: '野菜・その他', icon: '🥕' },
+    meat: { label: '肉', icon: 'meat' },
+    fish: { label: '魚介', icon: 'fish' },
+    eggsoy: { label: '卵・大豆', icon: 'egg' },
+    veg: { label: '野菜・その他', icon: 'carrot' },
 };
 
 const MEAT_INGS = new Set(MEAT_LIST);

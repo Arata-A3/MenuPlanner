@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>今日の献立メーカー🍳</title>
+    <title>今日の献立メーカー</title>
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json">
@@ -22,9 +22,9 @@
 
 <body>
     <div id="update-banner" class="update-banner" role="status" hidden>
-        <span>✨ 新しいバージョンがあります</span>
+        <svg class="ic" aria-hidden="true"><use href="#i-sparkle"></use></svg><span>新しいバージョンがあります</span>
         <button id="update-reload" class="primary-btn small">更新する</button>
-        <button id="update-dismiss" class="icon-btn" aria-label="閉じる">✕</button>
+        <button id="update-dismiss" class="icon-btn" aria-label="閉じる"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></button>
     </div>
     <header class="app-header">
         <div class="brand">
@@ -36,21 +36,21 @@
         </div>
         <div class="header-actions">
             <button id="open-shopping" class="pill-btn" aria-label="買い物リスト">
-                <span aria-hidden="true">🛒</span><span class="pill-label">買い物</span><span id="shopping-badge" class="badge-count"></span>
+                <svg class="ic" aria-hidden="true"><use href="#i-cart"></use></svg><span class="pill-label">買い物</span><span id="shopping-badge" class="badge-count"></span>
             </button>
             <button id="open-settings" class="pill-btn" aria-label="設定">
-                <span aria-hidden="true">⚙️</span><span class="pill-label">設定</span><span id="settings-badge" class="badge-count"></span>
+                <svg class="ic" aria-hidden="true"><use href="#i-sliders"></use></svg><span class="pill-label">設定</span><span id="settings-badge" class="badge-count"></span>
             </button>
         </div>
     </header>
 
     <nav class="tabs" aria-label="メニュー">
-        <button class="tab-btn active" data-target="ingredient-tab"><span class="tab-icon">🥒</span><span class="tab-label">材料から</span></button>
-        <button class="tab-btn" data-target="random-tab"><span class="tab-icon">🎲</span><span class="tab-label">ランダム</span></button>
-        <button class="tab-btn" data-target="question-tab"><span class="tab-icon">💬</span><span class="tab-label">質問</span></button>
-        <button class="tab-btn" data-target="inspire-tab"><span class="tab-icon">💡</span><span class="tab-label">ひらめき</span></button>
-        <button class="tab-btn" data-target="week-tab"><span class="tab-icon">📆</span><span class="tab-label">1週間</span></button>
-        <button class="tab-btn" data-target="history-tab"><span class="tab-icon">📅</span><span class="tab-label">記録</span></button>
+        <button class="tab-btn active" data-target="ingredient-tab"><span class="tab-icon"><svg class="ic" aria-hidden="true"><use href="#i-fridge"></use></svg></span><span class="tab-label">材料から</span></button>
+        <button class="tab-btn" data-target="random-tab"><span class="tab-icon"><svg class="ic" aria-hidden="true"><use href="#i-dice"></use></svg></span><span class="tab-label">ランダム</span></button>
+        <button class="tab-btn" data-target="question-tab"><span class="tab-icon"><svg class="ic" aria-hidden="true"><use href="#i-chat"></use></svg></span><span class="tab-label">質問</span></button>
+        <button class="tab-btn" data-target="inspire-tab"><span class="tab-icon"><svg class="ic" aria-hidden="true"><use href="#i-bulb"></use></svg></span><span class="tab-label">ひらめき</span></button>
+        <button class="tab-btn" data-target="week-tab"><span class="tab-icon"><svg class="ic" aria-hidden="true"><use href="#i-calendar"></use></svg></span><span class="tab-label">1週間</span></button>
+        <button class="tab-btn" data-target="history-tab"><span class="tab-icon"><svg class="ic" aria-hidden="true"><use href="#i-notebook"></use></svg></span><span class="tab-label">記録</span></button>
     </nav>
 
     <main class="tab-content">
@@ -61,7 +61,7 @@
                 <h2>冷蔵庫にある材料は？</h2>
                 <p>選んだ材料をたくさん使う料理から順に出します</p>
             </div>
-            <input id="ingredient-filter" class="search-input" type="search" placeholder="🔍 材料名で探す（例: 豚肉、きのこ）" autocomplete="off">
+            <label class="search-box"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg><input id="ingredient-filter" class="search-input" type="search" placeholder="材料名で探す（例: 豚肉、きのこ）" autocomplete="off" aria-label="材料名で探す"></label>
             <div id="ingredient-cats" class="cat-chips" role="tablist" aria-label="材料の種類"></div>
             <div id="ingredient-list" class="ingredient-tags"></div>
 
@@ -82,7 +82,7 @@
                 <p>定番の料理ほど出やすくなっています（設定で変更できます）</p>
             </div>
             <div id="random-display" class="random-display">ここになにかが出ます！</div>
-            <button id="start-random" class="primary-btn wide">ルーレットを回す 🎲</button>
+            <button id="start-random" class="primary-btn wide"><svg class="ic" aria-hidden="true"><use href="#i-dice"></use></svg>ルーレットを回す</button>
             <div id="random-result" class="result-area"></div>
         </section>
 
@@ -106,7 +106,7 @@
                 <p>最近食べたもの・足りない栄養・季節から、いつもと違うメニューを理由つきで提案します</p>
             </div>
             <div id="inspire-summary" class="info-box"></div>
-            <button id="start-inspire" class="primary-btn wide">ひらめきをもらう 💡</button>
+            <button id="start-inspire" class="primary-btn wide"><svg class="ic" aria-hidden="true"><use href="#i-bulb"></use></svg>ひらめきをもらう</button>
             <div id="inspire-result" class="result-area"></div>
         </section>
 
@@ -140,7 +140,7 @@
                     </div>
                 </div>
             </div>
-            <button id="start-week" class="primary-btn wide">献立を作る 📆</button>
+            <button id="start-week" class="primary-btn wide"><svg class="ic" aria-hidden="true"><use href="#i-calendar"></use></svg>献立を作る</button>
             <div id="week-result" class="result-area"></div>
         </section>
 
@@ -157,17 +157,17 @@
                 <button id="history-add" class="primary-btn small">記録</button>
             </div>
             <div class="panel">
-                <h3 class="panel-title">🥗 最近7日間の栄養バランス</h3>
+                <h3 class="panel-title"><svg class="ic" aria-hidden="true"><use href="#i-sprout"></use></svg>最近7日間の栄養バランス</h3>
                 <div id="balance-area" class="balance-area"></div>
             </div>
             <div class="panel">
-                <h3 class="panel-title">⭐ お気に入り</h3>
+                <h3 class="panel-title"><svg class="ic" aria-hidden="true"><use href="#i-star"></use></svg>お気に入り</h3>
                 <div id="fav-list" class="pref-list"></div>
-                <h3 class="panel-title sub">🚫 もう出さない料理</h3>
+                <h3 class="panel-title sub"><svg class="ic" aria-hidden="true"><use href="#i-ban"></use></svg>もう出さない料理</h3>
                 <div id="blocked-list" class="pref-list"></div>
             </div>
             <div class="panel">
-                <h3 class="panel-title">📅 最近30日間 <span class="muted small">👍👎 で評価すると提案に反映されます</span></h3>
+                <h3 class="panel-title"><svg class="ic" aria-hidden="true"><use href="#i-notebook"></use></svg>最近30日間 <span class="muted small"><svg class="ic" aria-hidden="true"><use href="#i-thumb-up"></use></svg><svg class="ic" aria-hidden="true"><use href="#i-thumb-down"></use></svg>で評価すると提案に反映されます</span></h3>
                 <div id="history-list" class="history-list"></div>
                 <button id="history-clear" class="text-btn danger">記録をすべて消す</button>
             </div>
@@ -181,12 +181,12 @@
     <!-- 設定 -->
     <dialog id="settings-dialog" class="dialog">
         <div class="dialog-head">
-            <h2>⚙️ 設定</h2>
-            <button id="settings-close" class="icon-btn" aria-label="閉じる">✕</button>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-sliders"></use></svg>設定</h2>
+            <button id="settings-close" class="icon-btn" aria-label="閉じる"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></button>
         </div>
         <div class="dialog-body">
             <details class="setting-section" open>
-                <summary><span>🚫 アレルギー</span><span id="sum-allergy" class="sum-value"></span></summary>
+                <summary><span><svg class="ic" aria-hidden="true"><use href="#i-ban"></use></svg>アレルギー</span><span id="sum-allergy" class="sum-value"></span></summary>
                 <div class="setting-inner">
                     <p class="muted small">選んだ食材を含む料理は表示しません。</p>
                     <div id="allergen-options"></div>
@@ -201,7 +201,7 @@
             </details>
 
             <details class="setting-section">
-                <summary><span>🙅 苦手な食材</span><span id="sum-dislike" class="sum-value"></span></summary>
+                <summary><span><svg class="ic" aria-hidden="true"><use href="#i-frown"></use></svg>苦手な食材</span><span id="sum-dislike" class="sum-value"></span></summary>
                 <div class="setting-inner">
                     <p class="muted small">入力した言葉を材料・料理名に含む料理を表示しません。</p>
                     <div class="inline-form">
@@ -213,7 +213,7 @@
             </details>
 
             <details class="setting-section">
-                <summary><span>🧭 提案のしかた</span><span id="sum-suggest" class="sum-value"></span></summary>
+                <summary><span><svg class="ic" aria-hidden="true"><use href="#i-compass"></use></svg>提案のしかた</span><span id="sum-suggest" class="sum-value"></span></summary>
                 <div class="setting-inner">
                     <h4>最近食べた料理を除外</h4>
                     <div class="segmented" data-setting="recentDays">
@@ -238,7 +238,7 @@
             </details>
 
             <details class="setting-section">
-                <summary><span>👪 人数・表示</span><span id="sum-display" class="sum-value"></span></summary>
+                <summary><span><svg class="ic" aria-hidden="true"><use href="#i-users"></use></svg>人数・表示</span><span id="sum-display" class="sum-value"></span></summary>
                 <div class="setting-inner">
                     <h4>何人分作る？</h4>
                     <div class="segmented" data-setting="servings">
@@ -260,12 +260,12 @@
             </details>
 
             <details class="setting-section">
-                <summary><span>💾 バックアップ</span></summary>
+                <summary><span><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg>バックアップ</span></summary>
                 <div class="setting-inner">
                     <p class="muted small">設定・食事の記録・買い物リストはこの端末のブラウザにだけ保存されます。機種変更の前に書き出しておき、新しい端末で読み込んでください。</p>
                     <div class="btn-row left">
-                        <button id="backup-export" class="secondary-btn small">書き出す（ファイル保存）</button>
-                        <button id="backup-import" class="secondary-btn small">読み込む</button>
+                        <button id="backup-export" class="secondary-btn small"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg>書き出す（ファイル保存）</button>
+                        <button id="backup-import" class="secondary-btn small"><svg class="ic" aria-hidden="true"><use href="#i-upload"></use></svg>読み込む</button>
                         <input id="backup-file" type="file" accept="application/json,.json" hidden>
                     </div>
                 </div>
@@ -278,12 +278,12 @@
     <!-- 買い物リスト -->
     <dialog id="shopping-dialog" class="dialog">
         <div class="dialog-head">
-            <h2>🛒 買い物リスト</h2>
-            <button id="shopping-close" class="icon-btn" aria-label="閉じる">✕</button>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-cart"></use></svg>買い物リスト</h2>
+            <button id="shopping-close" class="icon-btn" aria-label="閉じる"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></button>
         </div>
         <div id="shopping-body" class="dialog-body"></div>
         <div class="dialog-foot">
-            <button id="shopping-share" class="primary-btn small">共有・コピー 📋</button>
+            <button id="shopping-share" class="primary-btn small"><svg class="ic" aria-hidden="true"><use href="#i-share"></use></svg>共有・コピー</button>
             <button id="shopping-clear-checked" class="secondary-btn small">チェック済みを消す</button>
             <button id="shopping-clear" class="text-btn danger">全部消す</button>
         </div>
@@ -293,14 +293,14 @@
     <dialog id="set-dialog" class="dialog">
         <div class="dialog-head">
             <h2 id="set-title">献立セット</h2>
-            <button id="set-close" class="icon-btn" aria-label="閉じる">✕</button>
+            <button id="set-close" class="icon-btn" aria-label="閉じる"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></button>
         </div>
         <div class="dialog-body">
             <p class="muted small">足りない栄養を補える副菜・汁物を組み合わせました。</p>
             <div id="set-body"></div>
         </div>
         <div class="dialog-foot">
-            <button id="set-reroll" class="secondary-btn small">別の組み合わせ 🔄</button>
+            <button id="set-reroll" class="secondary-btn small"><svg class="ic" aria-hidden="true"><use href="#i-refresh"></use></svg>別の組み合わせ</button>
         </div>
     </dialog>
 
@@ -308,7 +308,7 @@
     <dialog id="changelog-dialog" class="dialog small-dialog">
         <div class="dialog-head">
             <h2 id="changelog-title">更新履歴</h2>
-            <button id="changelog-close" class="icon-btn" aria-label="閉じる">✕</button>
+            <button id="changelog-close" class="icon-btn" aria-label="閉じる"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></button>
         </div>
         <div id="changelog-body" class="dialog-body"></div>
     </dialog>
@@ -319,6 +319,7 @@
     <script src="data-extra.js"></script>
     <script src="meta.js"></script>
     <script src="enrich.js"></script>
+    <script src="icons.js"></script>
     <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

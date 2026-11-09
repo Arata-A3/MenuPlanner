@@ -38,7 +38,7 @@ const server = http.createServer((req, res) => {
 
     // 材料グループ（新しい材料が分類されている）
     const groups = await page.locator('.cat-chip').allTextContents();
-    check(`材料グループ: ${groups.join(' / ')}`, groups.includes('🍎 果物・ナッツ') && groups.includes('🧂 調味料'));
+    check(`材料グループ: ${groups.join(' / ')}`, groups.includes('果物・ナッツ') && groups.includes('調味料'));
     await page.click('.cat-chip:text("その他")');
     const otherCount = await page.locator('#ingredient-list .ingredient-tag').count();
     check(`「その他」に残る材料は少ない (${otherCount}個)`, otherCount < 40);

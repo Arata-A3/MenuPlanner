@@ -1547,6 +1547,215 @@ body[data-tab="history-tab"] .cond-bar { display: none; }
 .changelog-item h3 { font-size: 0.95rem; color: var(--primary); }
 .changelog-item ul { padding-left: 1.2em; font-size: 0.9rem; }
 
+
+/* =====================================================================
+   アイコン（v2.5.0）
+   絵文字をやめて線画の SVG に。色は文字色に合わせて変わる
+   ===================================================================== */
+.ic {
+    width: 1.15em;
+    height: 1.15em;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vertical-align: -0.2em;
+}
+
+.ic.fill { fill: currentColor; }
+
+/* アイコンと文字を横に並べる部品 */
+.primary-btn,
+.secondary-btn,
+.pill-btn,
+.toggle-chip,
+.cat-chip,
+.answer-btn,
+.act,
+.reason-chip,
+.mini-chip,
+.pref-chip,
+.flag,
+.balance-label,
+.panel-title,
+.dialog-head h2,
+.shop-section h3,
+.setting-section summary > span:first-child,
+.allergen-main,
+.urgent-note,
+.hint,
+.nutri-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+}
+
+.primary-btn,
+.secondary-btn { justify-content: center; }
+.primary-btn.wide { display: flex; }
+.answer-btn { justify-content: center; }
+.nutri-chip { gap: 0.2em; }
+.nutri-chip .ic { width: 1.05em; height: 1.05em; }
+.flag, .allergen-main, .urgent-note { gap: 0.2em; }
+.hint { gap: 0.4em; }
+
+.panel-title .muted {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15em;
+}
+
+.filter-notice .ic {
+    margin-right: 0.35em;
+    color: var(--primary);
+}
+
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-btn .ic { width: 1.2em; height: 1.2em; }
+
+/* メニュー（タブ） */
+.tab-icon {
+    display: inline-flex;
+}
+
+.tab-icon .ic {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+/* 検索欄の虫めがね */
+.search-box {
+    position: relative;
+    display: block;
+}
+
+.search-box .ic {
+    position: absolute;
+    left: 13px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+}
+
+.search-box .search-input {
+    padding-left: 40px;
+}
+
+/* カード */
+.fav-btn {
+    display: inline-flex;
+    font-size: 1.2rem;
+    padding: 2px;
+    color: var(--muted);
+}
+
+.fav-btn.on { color: #f5a623; }
+
+.card-menu summary {
+    display: inline-flex;
+    padding: 2px 4px;
+}
+
+.card-menu summary .ic { width: 1.25em; height: 1.25em; }
+
+.card-menu-list button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card-menu-list button .ic.end {
+    margin-left: auto;
+    color: var(--ok);
+}
+
+.card-menu-list button.on { font-weight: bold; }
+
+.card-meta .ic {
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.15em;
+    margin-right: 1px;
+}
+
+.flag.spicy { color: var(--danger); }
+.flag.good { color: var(--ok); }
+.flag.bad { color: var(--muted); }
+
+/* 手間（3つの点） */
+.pips {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: 3px;
+    vertical-align: 0.05em;
+}
+
+.pips i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1.3px solid currentColor;
+}
+
+.pips i.on { background: currentColor; }
+
+.act .act-icon {
+    display: inline-flex;
+}
+
+.act .ic { width: 1.1em; height: 1.1em; }
+
+.match-info .ic { width: 1.05em; height: 1.05em; vertical-align: -0.18em; margin-right: 2px; }
+
+.urgent-note {
+    margin-left: 8px;
+    color: var(--danger);
+}
+
+.allergen-main .ic { color: var(--primary); }
+
+.reason-chip .ic { width: 1.05em; height: 1.05em; }
+
+/* 冷蔵庫のチップ */
+.urgent-btn,
+.remove-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 3px;
+}
+
+.urgent-btn { filter: none; opacity: 0.45; }
+.selected-chip.urgent .urgent-btn { opacity: 1; color: var(--danger); }
+.urgent-btn .ic,
+.remove-btn .ic { width: 1em; height: 1em; }
+
+/* 記録の評価 */
+.rate-btn {
+    display: inline-flex;
+    filter: none;
+    opacity: 0.4;
+    color: var(--muted);
+    padding: 3px 5px;
+}
+
+.rate-btn.on { opacity: 1; color: var(--primary); }
+
+.pref-chip .ic.fill { color: #f5a623; }
+
+.dislike-chip .ic,
+.ingredient-tag .ic { width: 0.95em; height: 0.95em; }
+
+.update-banner .ic { color: var(--primary); }
+.changelog-item h3 { display: flex; align-items: center; gap: 0.35em; }
+
 /* =====================================================================
    スマホ
    ===================================================================== */
@@ -1591,6 +1800,8 @@ body[data-tab="history-tab"] .cond-bar { display: none; }
     }
 
     .tab-icon { font-size: 1.25rem; line-height: 1.2; }
+    .tab-icon .ic { width: 1.15em; height: 1.15em; }
+    .pill-btn .ic { width: 1.2em; height: 1.2em; }
     .tab-label { font-size: 0.64rem; white-space: nowrap; }
     .week-cards { grid-template-columns: 1fr; }
 

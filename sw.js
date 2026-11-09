@@ -1,5 +1,5 @@
 // 更新が届くように「ネットワーク優先・つながらないときはキャッシュ」で動かす
-const CACHE_NAME = 'menu-planner-v2.4.0';
+const CACHE_NAME = 'menu-planner-v2.5.0';
 const urlsToCache = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const urlsToCache = [
   './data-extra.js',
   './meta.js',
   './enrich.js',
+  './icons.js',
   './app.js',
   './icon.png',
   './icon-192.png',

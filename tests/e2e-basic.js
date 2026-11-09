@@ -92,8 +92,8 @@ const server = http.createServer((req, res) => {
 
             // 4. 質問
             await page.click('.tab-btn[data-target="question-tab"]');
-            for (const label of ['がっつり食べたい！🥩', 'なんでもいい！', '魚介 🐟', 'じっくり長くてもOK🍳']) {
-                await page.click(`.answer-btn:text-is("${label}")`);
+            for (const label of ['がっつり食べたい！', 'なんでもいい！', '魚介', 'じっくり長くてもOK']) {
+                await page.click(`.answer-btn:has(span:text-is("${label}"))`);
             }
             const qn = await page.locator('#question-result .recipe-card').count();
             const hint = await page.locator('#question-result').textContent(); check(`質問で結果 or 0件ヒント (${qn})`, qn > 0 || hint.includes('調味料は除く'));
