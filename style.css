@@ -1859,3 +1859,131 @@ body[data-tab="history-tab"] .cond-bar { display: none; }
     .pill-label { display: none; }
     .app-header h1 { font-size: 1rem; }
 }
+
+/* =====================================================================
+   見やすさ（v2.6.0）
+   文字を少し大きく、余白を広く。カードの細かい情報は「材料・栄養」にまとめる
+   ===================================================================== */
+body { line-height: 1.65; }
+.small { font-size: 0.9rem; }
+.tagline { font-size: 0.85rem; }
+
+/* 結果の上の説明は、枠をやめて控えめな1行に */
+.filter-notice {
+    background: none;
+    border-left: none;
+    padding: 0;
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+
+.result-count { font-size: 0.92rem; margin-bottom: 10px; }
+.result-toolbar { margin-bottom: 8px; }
+.result-toolbar .muted.small { font-size: 0.92rem; }
+
+.recipe-cards {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+/* カード */
+.recipe-card {
+    padding: 18px 18px 14px;
+    gap: 10px;
+}
+
+.card-head { align-items: center; }
+.card-head h3 { font-size: 1.22rem; line-height: 1.4; }
+.kcal { font-size: 1.05rem; }
+.kcal small { font-size: 0.75rem; }
+
+.card-meta {
+    font-size: 0.9rem;
+    line-height: 1.7;
+}
+
+.card-meta .sep { margin: 0 6px; }
+
+.match-info { font-size: 0.95rem; line-height: 1.6; }
+.urgent-note { margin-left: 0; margin-right: 8px; }
+.match-info .urgent-note { display: flex; margin: 2px 0 0; }
+
+.my-allergen {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--danger);
+}
+
+.reason-chip { font-size: 0.88rem; padding: 3px 12px; }
+
+/* 材料・栄養（たたんだ中身） */
+.card-ings summary {
+    font-size: 0.9rem;
+    padding: 4px 0;
+}
+
+.card-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--surface-soft);
+}
+
+.card-ings .ing-text { font-size: 0.95rem; margin: 0; }
+.nutri-row { gap: 6px; }
+.nutri-chip { font-size: 0.82rem; padding: 2px 9px; }
+.pfc { font-size: 0.88rem; }
+.recipe-allergens { font-size: 0.88rem; gap: 4px 12px; }
+
+/* 操作ボタンは押しやすい大きさに */
+.card-actions { gap: 8px; padding-top: 12px; }
+
+.act {
+    min-height: 44px;
+    padding: 8px 4px;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    gap: 5px;
+}
+
+.fav-btn, .card-menu summary { padding: 6px; }
+.card-menu-list button { font-size: 0.95rem; padding: 10px 12px; }
+
+.recipe-card.compact { padding: 14px 16px; gap: 8px; }
+.recipe-card.compact .card-head h3 { font-size: 1.08rem; }
+
+/* 条件の切り替え */
+.cond-label { font-size: 0.85rem; }
+.toggle-chip { font-size: 0.9rem; padding: 6px 13px; }
+
+@media (max-width: 600px) {
+    body { padding-left: 16px; padding-right: 16px; }
+    .app-header h1 { font-size: 1.2rem; }
+    .recipe-cards { gap: 14px; }
+    .recipe-card { padding: 16px 16px 14px; }
+
+    /* 下のメニューの文字を読みやすく */
+    .tab-btn { padding: 6px 2px 5px; }
+    .tab-icon .ic { width: 1.3em; height: 1.3em; }
+    .tab-label { font-size: 0.74rem; }
+
+    .balance-row { font-size: 0.88rem; }
+}
+
+@media (max-width: 370px) {
+    .act { font-size: 0.85rem; }
+    .act .act-icon { display: none; }
+}
+
+/* 設定の選択肢 */
+.chip-options { gap: 8px; margin: 6px 0 14px; }
+.chip-options button { font-size: 0.95rem; padding: 5px 13px; }
+.caution { font-size: 0.88rem; }
+.segmented button { font-size: 0.95rem; padding: 8px 14px; }

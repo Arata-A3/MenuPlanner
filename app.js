@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------
 // 保存データ（設定と食事の記録）
 // ---------------------------------------------------------------------
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.6.0';
 const APP_UPDATED = '2026-11-10';
 
 const STORE_KEY = 'menuPlanner.v2';
@@ -338,6 +338,17 @@ function allergenLine(r) {
     return `<p class="recipe-allergens">${main}${optional}${seasoning}</p>`;
 }
 
+/** 自分のアレルゲンが「選ぶ材料」や調味料に入りうるときだけ、カードに目立たせて出す */
+function myAllergenWarning(r) {
+    const mine = state.settings.allergens;
+    if (!mine.length) return '';
+    const keys = [...r.optionalAllergens, ...(state.settings.allergenScope === 'all' ? [] : r.seasoningAllergens)]
+        .filter(k => mine.includes(k));
+    if (!keys.length) return '';
+    const labels = [...new Set(keys)].map(k => ALLERGEN_BY_KEY.get(k).label).join('・');
+    return `<p class="my-allergen">${icon('warning')}${labels}に注意（材料の選び方・調味料による）</p>`;
+}
+
 function difficultyStars(diff) {
     return `<span class="pips" aria-label="手間 ${diff}/3">${[1, 2, 3].map(i => `<i class="${i <= diff ? 'on' : ''}"></i>`).join('')}</span>`;
 }
@@ -418,11 +429,17 @@ function createRecipeCard(recipe, opts = {}) {
             </details>
         </div>
         <p class="card-meta">${meta.join('<span class="sep">·</span>')}</p>
-        ${recipe.pfc ? `<p class="pfc" title="たんぱく質・脂質・炭水化物（1人前の目安）">${pfcText(recipe.pfc)}</p>` : ''}
         ${opts.matchInfo ? `<p class="match-info ${opts.matchInfo.ok ? 'ok' : ''}">${opts.matchInfo.ok ? icon('check') : ''}${esc(opts.matchInfo.text)}${opts.matchInfo.urgent ? `<span class="urgent-note">${icon('alarm')}${esc(opts.matchInfo.urgent)}</span>` : ''}</p>` : ''}
-        <div class="nutri-row">${nutrientChips(recipe)}</div>
-        ${allergenLine(recipe)}
-        ${opts.compact ? '' : `<details class="card-ings"><summary>材料（${recipe.ingredients.length + recipe.alternatives.length}）</summary><p>${ingredientText(recipe)}</p></details>`}
+        ${myAllergenWarning(recipe)}
+        ${opts.compact ? `<div class="nutri-row">${nutrientChips(recipe)}</div>` : `<details class="card-ings">
+            <summary>材料・栄養（材料 ${recipe.ingredients.length + recipe.alternatives.length}）</summary>
+            <div class="card-detail">
+                <p class="ing-text">${ingredientText(recipe)}</p>
+                <div class="nutri-row">${nutrientChips(recipe)}</div>
+                ${recipe.pfc ? `<p class="pfc" title="たんぱく質・脂質・炭水化物（1人前の目安）">${pfcText(recipe.pfc)}</p>` : ''}
+                ${allergenLine(recipe)}
+            </div>
+        </details>`}
         <div class="card-actions">
             <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" class="act search-recipe-btn" title="レシピを検索"><span class="act-icon">${icon('search')}</span><span>レシピ</span></a>
             <button class="act eat-btn" ${eaten ? 'disabled' : ''} title="今日食べた料理として記録"><span class="act-icon">${icon(eaten ? 'check' : 'utensils')}</span><span class="eat-label">${eaten ? '記録済み' : '食べた'}</span></button>
@@ -2052,6 +2069,7 @@ function setShareText(items, totalKcal, withRice) {
 // 更新のお知らせ・更新履歴
 // ---------------------------------------------------------------------
 const CHANGELOG = [
+    { version: '2.6.0', items: ['文字とボタンを大きくして、料理カードをすっきり（材料・栄養はたたんで表示）'] },
     { version: '2.5.0', items: ['絵文字をやめて、どの端末・テーマでも同じに見えるアイコンに'] },
     { version: '2.4.0', items: ['冷蔵庫の材料を覚えるように（「早めに使う」印も付けられる）', '1週間の献立で食材を使い回せるように', '献立・1週間の献立を LINE などに共有', '新しいバージョンのお知らせ'] },
     { version: '2.3.0', items: ['「あと○○があれば作れる」表示', '1週間の献立', 'お気に入り・評価・もう出さない', '辛くない・レンジ・節約・時短の条件', '定番料理に PFC の目安'] },
