@@ -5,10 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>今日の献立メーカー🍳</title>
-    <link rel="icon" href="icon.png">
+    <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff9800">
+    <script>
+        // 保存されたテーマを描画前に当てる（一瞬明るく表示されるのを防ぐ）
+        try {
+            const t = JSON.parse(localStorage.getItem('menuPlanner.v2') || '{}').settings?.theme;
+            if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        } catch (e) { }
+    </script>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -17,7 +24,10 @@
     <header>
         <h1>今日の献立メーカー🍳</h1>
         <p>何を作るか迷ったときに！</p>
-        <button id="open-settings" class="settings-btn" aria-label="設定">⚙️ 設定<span id="settings-badge" class="badge-count"></span></button>
+        <div class="header-actions">
+            <button id="open-shopping" class="settings-btn" aria-label="買い物リスト">🛒 買い物リスト<span id="shopping-badge" class="badge-count"></span></button>
+            <button id="open-settings" class="settings-btn" aria-label="設定">⚙️ 設定<span id="settings-badge" class="badge-count"></span></button>
+        </div>
     </header>
 
     <main>
@@ -90,6 +100,10 @@
         </div>
     </main>
 
+    <footer class="app-footer">
+        <p>今日の献立メーカー <span id="app-version"></span></p>
+    </footer>
+
     <!-- 設定 -->
     <dialog id="settings-dialog" class="dialog">
         <div class="dialog-head">
@@ -101,7 +115,13 @@
             <h3>🚫 アレルギー</h3>
             <p class="muted small">選んだ食材を含む料理は表示しません。</p>
             <div id="allergen-options"></div>
-            <p class="caution">※ 材料と料理名から推定しています。醤油・味噌・カレールーなどの調味料や市販品に含まれる場合もあるので、必ず原材料表示を確認してください。</p>
+            <h4>調味料の扱い</h4>
+            <div class="segmented" data-setting="allergenScope">
+                <button data-value="all">調味料も含めて除外</button>
+                <button data-value="main">調味料は除く</button>
+            </div>
+            <p class="muted small">「調味料も含めて除外」は、醤油・味噌・だし・ごま油・コンソメ・カレールーなど、ふつう使われる調味料に含まれやすいものまで避けます（安全寄り）。「調味料は除く」は、料理そのものの材料だけで判定します。</p>
+            <p class="caution">※ 材料と料理名から推定しています。実際の商品やお店の料理では違うことがあるので、必ず原材料表示を確認してください。</p>
         </section>
 
         <section class="setting-section">
@@ -142,7 +162,53 @@
             </div>
         </section>
 
-        <p class="muted small">栄養・カロリーは材料からのざっくりした目安です。設定と記録はこの端末のブラウザにだけ保存されます。</p>
+        <section class="setting-section">
+            <h3>👪 何人分作る？</h3>
+            <div class="segmented" data-setting="servings">
+                <button data-value="1">1人</button>
+                <button data-value="2">2人</button>
+                <button data-value="3">3人</button>
+                <button data-value="4">4人</button>
+                <button data-value="5">5人</button>
+                <button data-value="6">6人</button>
+            </div>
+            <p class="muted small">レシピ検索・献立セットの合計カロリー・買い物リストに使います。</p>
+        </section>
+
+        <section class="setting-section">
+            <h3>🌙 画面の明るさ</h3>
+            <div class="segmented" data-setting="theme">
+                <button data-value="auto">端末に合わせる</button>
+                <button data-value="light">ライト</button>
+                <button data-value="dark">ダーク</button>
+            </div>
+        </section>
+
+        <section class="setting-section">
+            <h3>💾 バックアップ</h3>
+            <p class="muted small">設定・食事の記録・買い物リストはこの端末のブラウザにだけ保存されます。機種変更の前に書き出しておき、新しい端末で読み込んでください。</p>
+            <div class="btn-row left">
+                <button id="backup-export" class="secondary-btn small">書き出す（ファイル保存）</button>
+                <button id="backup-import" class="secondary-btn small">読み込む</button>
+                <input id="backup-file" type="file" accept="application/json,.json" hidden>
+            </div>
+        </section>
+
+        <p class="muted small">栄養・カロリーは材料からのざっくりした目安です。</p>
+    </dialog>
+
+    <!-- 買い物リスト -->
+    <dialog id="shopping-dialog" class="dialog">
+        <div class="dialog-head">
+            <h2>🛒 買い物リスト</h2>
+            <button id="shopping-close" class="icon-btn" aria-label="閉じる">✕</button>
+        </div>
+        <div id="shopping-body"></div>
+        <div class="btn-row">
+            <button id="shopping-share" class="primary-btn small">共有・コピー 📋</button>
+            <button id="shopping-clear-checked" class="secondary-btn small">チェック済みを消す</button>
+            <button id="shopping-clear" class="secondary-btn small">全部消す</button>
+        </div>
     </dialog>
 
     <!-- 献立セット -->
@@ -159,6 +225,7 @@
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script src="data.js"></script>
+    <script src="data-extra.js"></script>
     <script src="meta.js"></script>
     <script src="enrich.js"></script>
     <script src="app.js"></script>

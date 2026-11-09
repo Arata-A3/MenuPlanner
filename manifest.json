@@ -1,14 +1,14 @@
 {
   "name": "今日の献立メーカー",
   "short_name": "献立メーカー",
-  "description": "今日の献立を材料やランダム、質問から決めるウェブアプリ",
+  "description": "今日の献立を材料やランダム、質問、最近の食事と栄養バランスから決めるウェブアプリ",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#fffdf5",
   "theme_color": "#ff9800",
   "icons": [
     {
-      "src": "icon.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
