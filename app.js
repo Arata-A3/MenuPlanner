@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------
 // 保存データ（設定と食事の記録）
 // ---------------------------------------------------------------------
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 const APP_UPDATED = '2026-11-10';
 
 const STORE_KEY = 'menuPlanner.v2';
@@ -55,7 +55,12 @@ function normalizeState(parsed) {
             .map(d => ({ date: d.date, main: d.main, sides: ids(d.sides) }));
         if (days.length) weekPlan = { withSides: !!wp.withSides, days };
     }
-    return { settings, history, shopping, favorites, blocked, ratings, weekPlan };
+    // 冷蔵庫の中身（材料タブで選んだ材料）。urgent = 早めに使いたい
+    const fridge = Array.isArray(parsed && parsed.fridge)
+        ? parsed.fridge.filter(f => f && ALL_INGREDIENTS.includes(f.name))
+            .map(f => ({ name: f.name, urgent: !!f.urgent, added: /^\d{4}-\d{2}-\d{2}$/.test(f.added) ? f.added : null }))
+        : [];
+    return { settings, history, shopping, favorites, blocked, ratings, weekPlan, fridge };
 }
 
 function loadState() {
@@ -591,7 +596,25 @@ const ingredientCats = document.getElementById('ingredient-cats');
 const ingredientFilter = document.getElementById('ingredient-filter');
 const selectedChips = document.getElementById('selected-chips');
 const searchIngBtn = document.getElementById('search-by-ingredient');
-const selectedIngredients = new Set();
+// 選んでいる材料 = 冷蔵庫の中身（保存して次回も残す）
+const selectedIngredients = new Set(state.fridge.map(f => f.name));
+
+function saveFridge() {
+    const old = new Map(state.fridge.map(f => [f.name, f]));
+    state.fridge = [...selectedIngredients].map(name => old.get(name) || { name, urgent: false, added: dateStr() });
+    saveState();
+}
+
+const urgentIngredients = () => new Set(state.fridge.filter(f => f.urgent).map(f => f.name));
+
+/** 冷蔵庫の材料（特に早めに使いたいもの）を使う料理ほど大きくなる倍率 */
+function fridgeBoost(r) {
+    if (state.fridge.length === 0) return 1;
+    const urgent = urgentIngredients();
+    const urgentHit = r.allIngs.filter(i => urgent.has(i)).length;
+    const have = r.allIngs.filter(i => selectedIngredients.has(i) && !PANTRY_SET.has(i)).length;
+    return (1 + 1.2 * Math.min(urgentHit, 2)) * (1 + 0.15 * Math.min(have, 4));
+}
 
 // カテゴリごとの材料（どのカテゴリにも入らないものは「その他」へ）
 const ingredientGroups = (() => {
@@ -629,7 +652,16 @@ function makeIngredientTag(ing) {
 function toggleIngredient(ing) {
     if (selectedIngredients.has(ing)) selectedIngredients.delete(ing);
     else selectedIngredients.add(ing);
+    saveFridge();
     renderIngredientTags();
+    renderSelectedChips();
+}
+
+function toggleUrgent(ing) {
+    const f = state.fridge.find(x => x.name === ing);
+    if (!f) return;
+    f.urgent = !f.urgent;
+    saveState();
     renderSelectedChips();
 }
 
@@ -668,16 +700,31 @@ function renderIngredientTags() {
 function renderSelectedChips() {
     selectedChips.innerHTML = '';
     if (selectedIngredients.size === 0) {
-        selectedChips.innerHTML = '<span class="muted small">材料をタップして選んでね（選ばずに探すと全部から）</span>';
+        selectedChips.innerHTML = '<span class="muted small">🧊 冷蔵庫にある材料をタップ（選んだ材料は次回も残ります）</span>';
     }
-    selectedIngredients.forEach(ing => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'selected-chip';
-        b.textContent = `${ing} ✕`;
-        b.title = '選択をはずす';
-        b.addEventListener('click', () => toggleIngredient(ing));
-        selectedChips.appendChild(b);
+    const urgent = urgentIngredients();
+    // 早めに使いたい材料を先に並べる
+    [...selectedIngredients].sort((a, b) => urgent.has(b) - urgent.has(a)).forEach(ing => {
+        const chip = document.createElement('span');
+        chip.className = 'selected-chip' + (urgent.has(ing) ? ' urgent' : '');
+        const u = document.createElement('button');
+        u.type = 'button';
+        u.className = 'urgent-btn';
+        u.title = urgent.has(ing) ? '「早めに使う」をやめる' : '早めに使いたい材料にする';
+        u.setAttribute('aria-pressed', String(urgent.has(ing)));
+        u.textContent = '⏰';
+        u.addEventListener('click', () => toggleUrgent(ing));
+        const name = document.createElement('span');
+        name.textContent = ing;
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'remove-btn';
+        x.title = '冷蔵庫からはずす';
+        x.setAttribute('aria-label', `${ing}をはずす`);
+        x.textContent = '✕';
+        x.addEventListener('click', () => toggleIngredient(ing));
+        chip.append(u, name, x);
+        selectedChips.appendChild(chip);
     });
     searchIngBtn.textContent = selectedIngredients.size ? `${selectedIngredients.size}つの材料で探す` : '料理を探す';
 }
@@ -695,6 +742,8 @@ let readyOnly = false; // 「すぐ作れる（足りない材料1つまで）�
  */
 function readiness(r) {
     const has = i => selectedIngredients.has(i);
+    const urgent = urgentIngredients();
+    const urgentUsed = r.allIngs.filter(i => urgent.has(i));
     let used = 0;
     const missing = [];
     const extra = [];
@@ -708,15 +757,16 @@ function readiness(r) {
         if (g.some(has)) used++;
         else if (!g.every(i => PANTRY_SET.has(i))) missing.push(`${g.join('・')}のどれか`);
     });
-    return { used, missing, extra };
+    return { used, missing, extra, urgentUsed };
 }
 
 function readinessText(info) {
+    const urgentNote = info.urgentUsed.length ? ` ⏰${info.urgentUsed.join('・')}を使える` : '';
     if (info.missing.length === 0) {
-        return { ok: true, text: `✔ 全部そろってる！${info.extra.length ? `（あれば: ${info.extra.slice(0, 3).join('、')}）` : ''}` };
+        return { ok: true, text: `✔ 全部そろってる！${urgentNote}${info.extra.length ? `（あれば: ${info.extra.slice(0, 3).join('、')}）` : ''}` };
     }
     const list = info.missing.slice(0, 3).join('、') + (info.missing.length > 3 ? ` ほか${info.missing.length - 3}つ` : '');
-    return { ok: false, text: `あと ${list}` };
+    return { ok: false, text: `あと ${list}${urgentNote}` };
 }
 
 function runIngredientSearch(scroll) {
@@ -725,8 +775,9 @@ function runIngredientSearch(scroll) {
     const info = new Map(RECIPES.map(r => [r.id, readiness(r)]));
     const base = picking ? RECIPES.filter(r => info.get(r.id).used > 0) : RECIPES;
     const { ok, counts } = applyFilters(base);
-    // 足りない材料が少ない順 → 選んだ材料をたくさん使う順 → 定番順
+    // 足りない材料が少ない順 → 早めに使いたい材料を使う順 → 選んだ材料をたくさん使う順 → 定番順
     ok.sort((a, b) => (info.get(a.id).missing.length - info.get(b.id).missing.length)
+        || (info.get(b.id).urgentUsed.length - info.get(a.id).urgentUsed.length)
         || (info.get(b.id).used - info.get(a.id).used)
         || (baseWeight(b) - baseWeight(a)));
     const ready = ok.filter(r => info.get(r.id).missing.length <= 1);
@@ -755,7 +806,9 @@ function runIngredientSearch(scroll) {
 searchIngBtn.addEventListener('click', () => runIngredientSearch(true));
 
 document.getElementById('clear-ingredients').addEventListener('click', () => {
+    if (selectedIngredients.size >= 3 && !confirm('冷蔵庫の材料を全部はずしますか？')) return;
     selectedIngredients.clear();
+    saveFridge();
     renderIngredientTags();
     renderSelectedChips();
 });
@@ -790,7 +843,7 @@ startRandomBtn.addEventListener('click', () => {
         counter++;
         if (counter > maxSpins) {
             clearInterval(spinInterval);
-            const finalRecipe = weightedPick(ok, baseWeight);
+            const finalRecipe = weightedPick(ok, r => baseWeight(r) * fridgeBoost(r));
             randomDisplay.textContent = finalRecipe.name;
             const notice = exclusionNotice(counts);
             if (notice) {
@@ -969,7 +1022,7 @@ function generateInspiration() {
         return eaten.get(r.id) > 30 ? 1.2 : 0.5;
     };
     const generalWeight = r => {
-        let w = baseWeight(r) * novelty(r) * seasonInfo(r).factor;
+        let w = baseWeight(r) * novelty(r) * seasonInfo(r).factor * fridgeBoost(r);
         lacking.forEach(k => { w *= 1 + 0.6 * r.nutrients[k]; });
         if (trend && trend.topGenre === r.genre) w *= 0.4;
         if (trend && trend.topMain === r.main) w *= 0.4;
@@ -994,6 +1047,11 @@ function generateInspiration() {
     }
 
     const slots = [];
+    const urgent = [...urgentIngredients()];
+    if (urgent.length) {
+        slots.push([r => r.allIngs.some(i => urgent.includes(i)),
+            r => `⏰ 早めに使いたい${r.allIngs.filter(i => urgent.includes(i)).slice(0, 2).join('・')}を使う`]);
+    }
     if (lacking.length) {
         const key = lacking[0];
         slots.push([r => r.nutrients[key] === 2, () => `🩺 不足ぎみの${nutrientLabel(key)}がとれる`]);
@@ -1119,9 +1177,13 @@ function renderSet() {
     shopAll.className = 'secondary-btn small';
     shopAll.textContent = '🛒 材料を買い物リストへ';
     shopAll.addEventListener('click', () => addToShopping(items));
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'secondary-btn small';
+    shareBtn.textContent = '📤 共有';
+    shareBtn.addEventListener('click', () => shareText(setShareText(items, totalKcal, withRice), '今日の献立'));
     const row = document.createElement('div');
     row.className = 'btn-row';
-    row.append(eatAll, shopAll);
+    row.append(eatAll, shopAll, shareBtn);
     summary.appendChild(row);
     setBody.appendChild(summary);
 }
@@ -1549,20 +1611,7 @@ document.getElementById('shopping-clear').addEventListener('click', () => {
     updateShoppingBadge();
     renderShopping();
 });
-document.getElementById('shopping-share').addEventListener('click', async () => {
-    const text = shoppingText();
-    try {
-        if (navigator.share) {
-            await navigator.share({ text });
-            return;
-        }
-        await navigator.clipboard.writeText(text);
-        showToast('買い物リストをコピーしました');
-    } catch (e) {
-        if (e && e.name === 'AbortError') return; // 共有をキャンセルした
-        showToast('コピーできませんでした');
-    }
-});
+document.getElementById('shopping-share').addEventListener('click', () => shareText(shoppingText(), '買い物リスト'));
 shoppingDialog.addEventListener('click', e => { if (e.target === shoppingDialog) shoppingDialog.close(); });
 
 // ---------------------------------------------------------------------
@@ -1693,7 +1742,14 @@ const weekResult = document.getElementById('week-result');
 const weekOptions = {
     days: state.weekPlan ? state.weekPlan.days.length : 7,
     withSides: state.weekPlan ? state.weekPlan.withSides : false,
+    reuse: state.weekPlan && state.weekPlan.reuse === false ? false : true, // 食材を使い回す
 };
+
+// 使い回すと得な、日持ちしにくい材料（野菜・きのこ・豆腐・乳製品など）
+const PERISHABLE = new Set([...ingredientCategories['🥕 野菜・きのこ'], '豆腐', '厚揚げ', '油揚げ', '牛乳', '生クリーム', 'もやし', '納豆']);
+
+/** 買い物の単位になる材料（調味料・薬味は除く） */
+const shopIngs = r => r.ingredients.filter(i => !PANTRY_SET.has(i) && !OPTIONAL_INGS.has(i));
 
 function addDays(str, n) {
     const [y, m, d] = str.split('-').map(Number);
@@ -1733,13 +1789,34 @@ function planWeight(r, ctx) {
     if (r.role !== 'K') w *= Math.pow(0.5, ctx.roleCount[r.role] || 0);
     if (r.role === 'K') w *= 1.3; // 主菜を中心に
     if (!ctx.hasFish && r.main === 'fish' && ctx.remaining <= 3) w *= 2.5; // 1回は魚を
+    // 他の日と同じ材料を使う料理を優先（特に日持ちしない野菜など）
+    // 新しく買う材料が増える料理ほど出にくく、日持ちしない材料を他の日と共有できる料理ほど出やすく
+    if (weekOptions.reuse && ctx.ingUse.size) {
+        let f = 1;
+        shopIngs(r).forEach(i => {
+            if (ctx.ingUse.has(i)) f *= PERISHABLE.has(i) ? 1.6 : 1.2;
+            else f *= PERISHABLE.has(i) ? 0.6 : 0.75;
+        });
+        w *= Math.min(Math.max(f, 0.05), 4);
+    }
+    // 冷蔵庫の材料、特に早めに使いたいものは最初の3日に
+    const urgent = urgentIngredients();
+    const urgentHit = r.allIngs.filter(i => urgent.has(i) && !ctx.urgentDone.has(i)).length;
+    if (urgentHit) w *= ctx.index < 3 ? 1 + 2 * urgentHit : 1 + 0.5 * urgentHit;
+    const have = r.allIngs.filter(i => selectedIngredients.has(i) && !PANTRY_SET.has(i)).length;
+    w *= 1 + 0.15 * Math.min(have, 4);
     return w;
 }
 
 function planContext(plan, index) {
-    const ctx = { eaten: lastEatenDays(), mainCount: {}, genreCount: {}, roleCount: {}, hasFish: false, neighbors: [] };
+    const ctx = { eaten: lastEatenDays(), mainCount: {}, genreCount: {}, roleCount: {}, hasFish: false, neighbors: [], ingUse: new Set(), urgentDone: new Set(), index };
+    const urgent = urgentIngredients();
     plan.forEach((d, i) => {
         if (i === index || !d) return;
+        [d.main, ...d.sides].forEach(id => RECIPE_BY_ID.get(id).allIngs.forEach(ing => {
+            ctx.ingUse.add(ing);
+            if (urgent.has(ing)) ctx.urgentDone.add(ing);
+        }));
         const r = RECIPE_BY_ID.get(d.main);
         ctx.mainCount[r.main] = (ctx.mainCount[r.main] || 0) + 1;
         ctx.genreCount[r.genre] = (ctx.genreCount[r.genre] || 0) + 1;
@@ -1755,7 +1832,13 @@ function pickPlanDay(plan, index, date, pool) {
     ctx.weekday = weekdayOf(date);
     ctx.remaining = plan.length - index;
     const used = new Set(plan.filter((d, i) => d && i !== index).map(d => d.main));
-    const candidates = pool.filter(r => !used.has(r.id));
+    let candidates = pool.filter(r => !used.has(r.id));
+    // 最初の3日は、まだ使っていない「早めに使う」材料があればそれを使う料理から選ぶ
+    if (index < 3) {
+        const urgentLeft = [...urgentIngredients()].filter(i => !ctx.urgentDone.has(i));
+        const usingUrgent = candidates.filter(r => r.allIngs.some(i => urgentLeft.includes(i)));
+        if (usingUrgent.length) candidates = usingUrgent;
+    }
     const main = weightedPick(candidates, r => planWeight(r, ctx)) || candidates[0];
     if (!main) return null;
     let sides = [];
@@ -1778,7 +1861,7 @@ function generateWeek() {
     for (let i = 0; i < plan.length; i++) {
         plan[i] = pickPlanDay(plan, i, addDays(start, i), ok);
     }
-    state.weekPlan = { withSides: weekOptions.withSides, days: plan.filter(Boolean) };
+    state.weekPlan = { withSides: weekOptions.withSides, reuse: weekOptions.reuse, days: plan.filter(Boolean) };
     saveState();
     renderWeek();
 }
@@ -1786,10 +1869,12 @@ function generateWeek() {
 function rerollDay(index) {
     const plan = state.weekPlan.days;
     const { ok } = applyFilters(RECIPES.filter(r => MAIN_DISH_ROLES.includes(r.role)));
-    const prevWithSides = weekOptions.withSides;
+    // 作ったときの形・使い回しの設定で選び直す
+    const prev = { withSides: weekOptions.withSides, reuse: weekOptions.reuse };
     weekOptions.withSides = state.weekPlan.withSides;
+    weekOptions.reuse = state.weekPlan.reuse !== false;
     const next = pickPlanDay(plan, index, plan[index].date, ok);
-    weekOptions.withSides = prevWithSides;
+    Object.assign(weekOptions, prev);
     if (next) {
         plan[index] = next;
         saveState();
@@ -1797,12 +1882,17 @@ function rerollDay(index) {
     }
 }
 
+function weekOptionValue(key, raw) {
+    if (key === 'days') return Number(raw);
+    if (key === 'withSides') return raw === 'set';
+    return raw === 'on'; // reuse
+}
+
 function renderWeekOptions() {
     document.querySelectorAll('[data-week]').forEach(group => {
         group.querySelectorAll('button').forEach(b => {
             const key = group.dataset.week;
-            const value = key === 'days' ? Number(b.dataset.value) : b.dataset.value === 'set';
-            b.classList.toggle('selected', weekOptions[key] === value);
+            b.classList.toggle('selected', weekOptions[key] === weekOptionValue(key, b.dataset.value));
         });
     });
 }
@@ -1811,7 +1901,7 @@ document.querySelectorAll('[data-week]').forEach(group => {
     group.querySelectorAll('button').forEach(b => {
         b.addEventListener('click', () => {
             const key = group.dataset.week;
-            weekOptions[key] = key === 'days' ? Number(b.dataset.value) : b.dataset.value === 'set';
+            weekOptions[key] = weekOptionValue(key, b.dataset.value);
             renderWeekOptions();
         });
     });
@@ -1835,9 +1925,21 @@ function renderWeek() {
         return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="mini-chip">${k} ${v}</span>`).join('');
     };
 
+    // 何日使うか（調味料・薬味を除く）
+    const useDays = new Map();
+    plan.days.forEach(d => {
+        const ings = new Set([d.main, ...d.sides].flatMap(id => shopIngs(RECIPE_BY_ID.get(id))));
+        ings.forEach(i => useDays.set(i, (useDays.get(i) || 0) + 1));
+    });
+    const shared = [...useDays].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]);
+    const urgentLeft = [...urgentIngredients()].filter(i => !plan.days.some(d =>
+        [d.main, ...d.sides].some(id => RECIPE_BY_ID.get(id).allIngs.includes(i))));
+
     const summary = document.createElement('div');
     summary.className = 'panel week-summary';
     summary.innerHTML = `
+        <p class="small">買う材料 <strong>${useDays.size}</strong> 種類${shared.length ? `・使い回す材料: ${shared.slice(0, 6).map(([i, n]) => `${esc(i)}(${n}日)`).join('、')}` : ''}</p>
+        ${urgentLeft.length ? `<p class="small warn">⏰ ${urgentLeft.map(esc).join('・')} を使う日がありません（🔄 で作り直せます）</p>` : ''}
         <p><strong>${plan.days.length}日分</strong>・1日あたり 約 <strong>${avg}</strong> kcal<span class="muted small">（${plan.withSides ? '主菜＋副菜・汁物' : '主菜'}／ご飯別・1人前）</span></p>
         <div class="mini-row">${countBy(mains, 'main', k => `${MAIN_CATEGORIES[k].icon}${MAIN_CATEGORIES[k].label}`)}</div>
         <div class="mini-row">${countBy(mains, 'genre', k => k)}</div>
@@ -1857,10 +1959,18 @@ function renderWeek() {
         saveState();
         renderWeek();
     });
-    actions.append(shop, clear);
+    const share = document.createElement('button');
+    share.className = 'secondary-btn small';
+    share.textContent = '📤 共有';
+    share.addEventListener('click', () => shareText(weekShareText(plan), '1週間の献立'));
+    actions.append(shop, share, clear);
     summary.appendChild(actions);
     weekResult.appendChild(summary);
 
+    // 主菜だけのときは日ごとの枠を横に並べる（PC で縦に長くならないように）
+    const daysBox = document.createElement('div');
+    daysBox.className = 'week-days' + (plan.withSides ? '' : ' grid');
+    weekResult.appendChild(daysBox);
     plan.days.forEach((d, index) => {
         const day = document.createElement('section');
         day.className = 'week-day' + (d.date === dateStr() ? ' today' : '');
@@ -1879,11 +1989,100 @@ function renderWeek() {
         grid.appendChild(createRecipeCard(RECIPE_BY_ID.get(d.main), { compact: true }));
         d.sides.forEach(id => grid.appendChild(createRecipeCard(RECIPE_BY_ID.get(id), { compact: true, noSet: true })));
         day.appendChild(grid);
-        weekResult.appendChild(day);
+        daysBox.appendChild(day);
     });
 }
 
 document.getElementById('start-week').addEventListener('click', generateWeek);
+
+// ---------------------------------------------------------------------
+// 共有（LINE などに送る）
+// ---------------------------------------------------------------------
+const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '');
+
+/** スマホでは共有メニュー、PC ではクリップボードにコピー */
+async function shareText(text, label) {
+    try {
+        if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+            await navigator.share({ text });
+            return;
+        }
+        await navigator.clipboard.writeText(text);
+        showToast(`${label}をコピーしました。LINE などに貼り付けて送れます`);
+    } catch (e) {
+        if (e && e.name === 'AbortError') return; // 共有をキャンセルした
+        showToast('コピーできませんでした');
+    }
+}
+
+function weekShareText(plan) {
+    const md = str => { const [, m, d] = str.split('-').map(Number); return `${m}/${d}`; };
+    const first = plan.days[0].date;
+    const last = plan.days[plan.days.length - 1].date;
+    const lines = [`📆 献立（${md(first)}〜${md(last)}）`];
+    plan.days.forEach(d => {
+        const wd = '日月火水木金土'[weekdayOf(d.date)];
+        const main = RECIPE_BY_ID.get(d.main).name;
+        const sides = d.sides.map(id => RECIPE_BY_ID.get(id).name);
+        lines.push(`${md(d.date)}(${wd}) ${main}${sides.length ? ` ＋ ${sides.join('・')}` : ''}`);
+    });
+    lines.push('', `— 今日の献立メーカー ${APP_URL}`);
+    return lines.join('\n');
+}
+
+function setShareText(items, totalKcal, withRice) {
+    const lines = ['🍱 今日の献立'];
+    items.forEach(r => lines.push(`${ROLE_LABELS[r.role]}: ${r.name}`));
+    if (withRice) lines.push('主食: ご飯');
+    lines.push(`（1人あたり 約${totalKcal}kcal）`, '', `— 今日の献立メーカー ${APP_URL}`);
+    return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------
+// 更新のお知らせ・更新履歴
+// ---------------------------------------------------------------------
+const CHANGELOG = [
+    { version: '2.4.0', items: ['冷蔵庫の材料を覚えるように（⏰ で「早めに使う」印）', '1週間の献立で食材を使い回せるように', '献立・1週間の献立を LINE などに共有', '新しいバージョンのお知らせ'] },
+    { version: '2.3.0', items: ['「あと○○があれば作れる」表示', '1週間の献立', 'お気に入り・評価・もう出さない', '辛くない・レンジ・節約・時短の条件', '定番料理に PFC の目安'] },
+    { version: '2.2.0', items: ['画面を見やすく作り直し（スマホは下にメニュー）', 'ダークテーマの見やすさを改善'] },
+    { version: '2.1.0', items: ['料理628品・材料346種類に', 'アレルギー34項目・調味料の扱いを選べるように', '買い物リスト・バックアップ・ダークモード'] },
+    { version: '2.0.0', items: ['アレルギー・栄養表示・食事の記録・ひらめき提案'] },
+];
+const SEEN_KEY = 'menuPlanner.seenVersion';
+const changelogDialog = document.getElementById('changelog-dialog');
+
+function openChangelog(onlyLatest) {
+    const list = onlyLatest ? CHANGELOG.slice(0, 1) : CHANGELOG;
+    document.getElementById('changelog-title').textContent = onlyLatest ? `✨ v${APP_VERSION} で新しくなりました` : '📝 更新履歴';
+    document.getElementById('changelog-body').innerHTML = list.map(c => `
+        <section class="changelog-item">
+            <h3>v${c.version}</h3>
+            <ul>${c.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+        </section>`).join('');
+    changelogDialog.showModal();
+}
+
+function checkWhatsNew() {
+    let seen = null;
+    try {
+        seen = localStorage.getItem(SEEN_KEY);
+        localStorage.setItem(SEEN_KEY, APP_VERSION);
+    } catch (e) { return; }
+    // 初めて使う人には出さない（前のバージョンを使っていた人だけ）
+    const usedBefore = seen !== null || state.history.length > 0 || state.shopping.length > 0;
+    if (seen !== APP_VERSION && usedBefore) openChangelog(true);
+}
+
+document.getElementById('changelog-close').addEventListener('click', () => changelogDialog.close());
+changelogDialog.addEventListener('click', e => { if (e.target === changelogDialog) changelogDialog.close(); });
+document.getElementById('app-version').addEventListener('click', () => openChangelog(false));
+
+/** 新しい版が届いたときに画面上部に出すお知らせ（index.html の Service Worker 登録から呼ぶ） */
+window.showUpdateBanner = () => {
+    document.getElementById('update-banner').hidden = false;
+};
+document.getElementById('update-reload').addEventListener('click', () => location.reload());
+document.getElementById('update-dismiss').addEventListener('click', () => { document.getElementById('update-banner').hidden = true; });
 
 // ---------------------------------------------------------------------
 // 初期表示
@@ -1896,3 +2095,4 @@ renderSettings();
 renderConditionBar();
 renderInspireSummary();
 updateShoppingBadge();
+checkWhatsNew();

@@ -1,0 +1,13 @@
+{
+  "name": "menu-planner",
+  "version": "2.4.0",
+  "private": true,
+  "description": "今日の献立メーカー",
+  "scripts": {
+    "test": "node tests/run-all.js",
+    "test:data": "node tests/data.test.js"
+  },
+  "devDependencies": {
+    "playwright": "1.48.2"
+  }
+}

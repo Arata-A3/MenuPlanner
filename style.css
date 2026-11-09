@@ -1460,6 +1460,14 @@ body[data-tab="history-tab"] .cond-bar { display: none; }
 
 .week-day.today .week-day-head h3 { color: var(--primary); }
 
+.week-days.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0 14px;
+}
+
+.week-days.grid .week-cards { grid-template-columns: 1fr; }
+
 .week-cards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
@@ -1467,6 +1475,77 @@ body[data-tab="history-tab"] .cond-bar { display: none; }
 }
 
 .center { text-align: center; }
+
+
+/* =====================================================================
+   v2.4.0 で追加した部品
+   ===================================================================== */
+/* 冷蔵庫の材料チップ */
+.selected-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 2px 1px 4px;
+}
+
+.selected-chip.urgent {
+    background: var(--danger-soft);
+    border-color: var(--danger);
+    font-weight: bold;
+}
+
+.urgent-btn,
+.remove-btn {
+    border: none;
+    background: none;
+    border-radius: 999px;
+    padding: 0 4px;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--muted);
+}
+
+.urgent-btn { filter: grayscale(1); opacity: 0.5; }
+.selected-chip.urgent .urgent-btn { filter: none; opacity: 1; }
+.urgent-btn:hover,
+.remove-btn:hover { background: var(--neutral-bg); }
+
+.warn { color: var(--danger); }
+
+/* 更新のお知らせ */
+.update-banner {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0 0;
+    padding: 8px 12px;
+    background: var(--primary-soft);
+    border: 1px solid var(--primary);
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.update-banner[hidden] { display: none; }
+.update-banner span { flex: 1; }
+
+.version-link {
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.small-dialog { width: min(460px, calc(100vw - 32px)); }
+
+.changelog-item + .changelog-item { margin-top: 12px; }
+.changelog-item h3 { font-size: 0.95rem; color: var(--primary); }
+.changelog-item ul { padding-left: 1.2em; font-size: 0.9rem; }
 
 /* =====================================================================
    スマホ
